@@ -51,6 +51,7 @@ jobs:
       - name: Run tests
         run: pnpm test
       - name: Seed DB
+        if: ${{ hashFiles('db/migrations/*.sql') != '' }}
         run: pnpm db:migrate
         env:
           DBMATE_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
