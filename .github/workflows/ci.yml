@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Install / check / test / deps
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint, format and typecheck
+        run: pnpm check
+      - name: Unit tests
+        run: pnpm test:unit
+      - name: Dependency boundaries
+        run: pnpm deps:validate
+
+  docker-smoke:
+    name: Docker build / smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Build image
+        run: docker build -t openmessage-next:ci .
+      - name: Start container
+        run: >-
+          docker run -d --name app -p 3000:3000
+          -e NODE_ENV=production -e LOG_LEVEL=warn
+          -e POSTGRES_URL=127.0.0.1:1 -e POSTGRES_USER=ci
+          -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=ci
+          openmessage-next:ci
+      - name: Health check
+        run: curl --fail --retry 15 --retry-delay 1 --retry-connrefused http://localhost:3000/health
+      - name: Container logs
+        if: always()
+        run: docker logs app

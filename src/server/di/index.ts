@@ -21,6 +21,10 @@ export async function di(fastify: FastifyInstance) {
         import.meta.dirname,
         '../../modules/**/*.{repository,mapper,service,domain}.{js,ts}',
       ),
+      path.join(
+        import.meta.dirname,
+        '../../adapters/**/*.{repository,mapper,service,domain}.{js,ts}',
+      ),
     ],
     {
       formatName,

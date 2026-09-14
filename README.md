@@ -5,7 +5,7 @@ openMessage 后端重写母版。当前仓库只保留可启动、可检查的�
 ## 当前边界
 
 - 保留 Fastify、TypeScript、依赖注入、CQRS 基础设施、Postgres.js、DBMate、OpenTelemetry 与基础安全插件。
-- 保留 Cucumber、k6 和 semantic-release 的现有工具链，后续是否继续使用另行决定。
+- Cucumber、semantic-release 与 Postgres 持久化选型为暂缓决策项，详见 [doc/dependencies.md](doc/dependencies.md)。
 - 不包含 GraphQL、generated client、示例 migration、示例 seed 或示例业务模块。
 - 当前阶段禁止创建真实业务代码、数据库 schema，以及 Repository、Port、Domain 等占位结构。
 
@@ -50,11 +50,12 @@ pnpm start
 ```text
 src/
 ├── config/          环境配置
-├── modules/         后续业务模块入口，当前为空
-├── server/          Fastify、插件与依赖注入
-└── shared/          通用基础设施
+├── modules/         业务模块入口，当前为空
+├── adapters/        出站集成层（持久化实现、Provider 封装），当前为空
+├── interfaces/      入站交付层（HTTP 路由、MCP/Webhook 端点），当前为空
+├── server/          Fastify、插件与依赖注入（composition root）
+└── shared/          通用基础设施（CQRS、DB、异常、工具）
 tests/
-├── shared/          通用测试步骤
 └── support/         Cucumber 测试运行支持
 ```
 

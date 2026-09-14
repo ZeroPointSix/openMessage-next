@@ -111,9 +111,6 @@ importers:
       '@semantic-release/release-notes-generator':
         specifier: 14.1.1
         version: 14.1.1(semantic-release@25.0.9(supports-color@10.2.2)(typescript@6.0.3))(supports-color@10.2.2)
-      '@types/k6':
-        specifier: 2.2.0
-        version: 2.2.0
       '@types/node':
         specifier: 26.5.1
         version: 26.5.1
@@ -877,9 +874,6 @@ packages:
 
   '@types/istanbul-lib-coverage@2.0.6':
     resolution: {integrity: sha512-2QF/t/auWm0lsy8XtKVPG19v3sSOQlJe/YHZgfjb/KBBHOGSV+J2q/S671rcq9uTBrLAXmZpqJiaQbMT+zNU1w==}
-
-  '@types/k6@2.2.0':
-    resolution: {integrity: sha512-wuHM+JLcpV0VL2G8ltu0N3ZDbbq1GHkP5ypeMzTZcFFqpN8ioV0DojxQFKvlbnVzuhgnY7Yy+Hhl8LzstdplhQ==}
 
   '@types/node@26.5.1':
     resolution: {integrity: sha512-CzNm2FezW4VR/LjG6yUdiEgLE/rAQ9Slj5gCu/C2VrdcW7I0ahNZ8DRbHT7zOZ6r3ONgd/bsQIeSaoDGrd1C6g==}
@@ -3543,8 +3537,6 @@ snapshots:
   '@teppeis/multimaps@3.0.0': {}
 
   '@types/istanbul-lib-coverage@2.0.6': {}
-
-  '@types/k6@2.2.0': {}
 
   '@types/node@26.5.1':
     dependencies:

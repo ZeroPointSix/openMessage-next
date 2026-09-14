@@ -37,10 +37,13 @@
 
 ## 服务基础设施
 
-- Fastify 插件与路由注册位于 `src/server/`。
-- 通用 CQRS、数据库、异常和工具代码位于 `src/shared/`。
-- 所有 REST 路由统一使用 `/api` 前缀。
+- `src/server/` 是 composition root：只做 Fastify 插件注册与依赖装配，不承载业务规则。
+- `src/interfaces/` 是入站交付层：HTTP 路由（`*.route.ts`，由 server autoload 统一挂在 `/api` 前缀）、未来的 MCP/Webhook 端点。
+- `src/modules/` 承载业务模块；模块对外公开面只有 `index.ts` 与 `*.events.ts`，内部实现不对外。
+- `src/adapters/` 承载出站集成：持久化实现、外部服务/Provider SDK 封装。
+- `src/shared/` 与 `src/config/` 是叶子层：通用 CQRS、数据库、异常、工具代码与环境配置，不得反向依赖上层。
 - `/health` 必须始终可用，且不得依赖真实业务或数据库数据。
+- 上述边界由 `pnpm deps:validate`（dependency-cruiser）强制，规则见 `.dependency-cruiser.cjs`。
 
 ## 验证
 

@@ -20,7 +20,7 @@ export default async function createServer(fastify: FastifyInstance) {
   await di(fastify);
 
   await fastify.register(AutoLoad, {
-    dir: path.join(import.meta.dirname, '../modules'),
+    dir: path.join(import.meta.dirname, '../interfaces'),
     dirNameRoutePrefix: false,
     options: {
       prefix: '/api',

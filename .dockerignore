@@ -31,8 +31,8 @@ screenshots/
 .dependency-cruiser.cjs
 biome.json
 tsconfig.json
-commitlint.config.ts
-cucumber.json
+commitlint.config.cjs
+cucumber.mjs
 .specstory
 .history
 
@@ -48,4 +48,3 @@ db/
 .cache
 traces
 .nvmrc
-client.schema.d.ts
