@@ -1,6 +1,6 @@
 {
   "name": "openmessage-next",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "openMessage 后端重写母版",
   "author": "ZeroPointSix",
   "license": "MIT",
@@ -15,7 +15,7 @@
     "start:prod": "node --env-file=.env --import ./src/instrumentation.ts ./src/index.ts",
     "test": "pnpm test:unit",
     "test:coverage": "c8 node --test src/**/*.spec.ts",
-    "test:unit": "node --test src/**/*.spec.ts",
+    "test:unit": "node --test src/**/*.spec.ts tests/**/*.spec.ts",
     "test:e2e": "cucumber-js --exit",
     "format": "biome format --write .",
     "lint": "biome lint --write .",

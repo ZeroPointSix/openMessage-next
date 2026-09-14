@@ -84,15 +84,19 @@ module.exports = {
       },
     },
     {
-      name: 'no-cross-module-deps',
+      name: 'module-to-module-public-api-only',
       comment:
-        "Modules must not import each other directly, except another module's domain events " +
-        '(*.events.ts), which are the cross-module contract. Use the CQRS buses for the rest.',
+        "A module may depend on another module only through that module's index.ts " +
+        'or its domain events (*.events.ts). Module internals stay private.',
       severity: 'error',
       from: { path: '^src/modules/([^/]+)/' },
       to: {
         path: '^src/modules/[^/]+/',
-        pathNot: ['^src/modules/$1/', '[.]events[.]ts$'],
+        pathNot: [
+          '^src/modules/$1/',
+          '^src/modules/[^/]+/index[.]ts$',
+          '[.]events[.]ts$',
+        ],
       },
     },
 

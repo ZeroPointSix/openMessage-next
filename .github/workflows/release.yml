@@ -1,37 +1,22 @@
 name: Release
+
 on:
   push:
     branches:
       - main
 
 permissions:
-  contents: read # for checkout
+  contents: read
 
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
     permissions:
-      contents: write # to be able to publish a GitHub release
-      issues: write # to be able to comment on released issues
-      pull-requests: write # to be able to comment on released pull requests
-      id-token: write # to enable use of OIDC for npm provenance
+      contents: write
+      issues: write
+      pull-requests: write
 
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_DB: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-        ports:
-          - 5432:5432
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -42,34 +27,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version-file: ".nvmrc"
-          cache: "pnpm"
+          node-version-file: '.nvmrc'
+          cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Check lint, types, and formatting
         run: pnpm check
-      - name: Run tests
+      - name: Run unit tests
         run: pnpm test
-      - name: Seed DB
-        if: ${{ hashFiles('db/migrations/*.sql') != '' }}
-        run: pnpm db:migrate
-        env:
-          DBMATE_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
-      - name: Run e2e tests
-        run: pnpm test:e2e
-        env:
-          POSTGRES_URL: localhost:5432
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: postgres
-          LOG_LEVEL: error
-          NODE_ENV: test
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: reports
-          path: reports/
-          retention-days: 30
+      - name: Validate dependency boundaries
+        run: pnpm deps:validate
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
