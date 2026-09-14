@@ -1,6 +1,6 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
 
-const apiLayerPaths = ['dtos', 'dto\\.ts$', 'route\\.ts$', 'resolver\\.ts$'];
+const apiLayerPaths = ['dtos', 'dto\\.ts$', 'route\\.ts$'];
 
 const applicationLayerPaths = [
   'application',
@@ -120,7 +120,6 @@ module.exports = {
       from: {
         orphan: true,
         pathNot: [
-          '[.]graphql-schema[.]ts', // graphql schemas
           '(^|/)[.][^/]+[.](?:js|cjs|mjs|ts|cts|mts|json)$', // dot files
           '[.]d[.]ts$', // TypeScript declaration files
           '(^|/)tsconfig[.]json$', // TypeScript config

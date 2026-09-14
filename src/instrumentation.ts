@@ -10,7 +10,7 @@
  *
  * Controlled entirely by standard OpenTelemetry environment variables:
  *   OTEL_SDK_DISABLED            — set to "true" to disable (default in .env.example)
- *   OTEL_SERVICE_NAME            — logical service name (e.g. "fastify-boilerplate")
+ *   OTEL_SERVICE_NAME            — logical service name (e.g. "openmessage-next")
  *   OTEL_EXPORTER_OTLP_ENDPOINT  — collector URL  (e.g. http://localhost:4318)
  *   OTEL_TRACES_EXPORTER         — trace exporter  (default: "otlp")
  *   OTEL_METRICS_EXPORTER        — metrics exporter (default: "otlp")
