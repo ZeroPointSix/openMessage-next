@@ -10,8 +10,6 @@ minimumReleaseAge: 0
 # transitive dependencies must resolve from the registry.
 blockExoticSubdeps: true
 
-# Build-script allowlist. strictDepBuilds (on by default in v11) fails installs when a
-# dependency has an unreviewed lifecycle script, so each such package must be listed here.
-# protobufjs ships prebuilt JS; its postinstall (pbjs/pbts CLI) is not used by this project.
+# protobufjs is transitive and its prebuilt output is sufficient for this project.
 allowBuilds:
   protobufjs: false

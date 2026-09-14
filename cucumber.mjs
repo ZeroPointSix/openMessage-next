@@ -1,4 +1,9 @@
 // https://github.com/cucumber/cucumber-js/blob/main/docs/configuration.md
+
+// Tell @fastify/autoload to load .ts sources directly (cross-platform — avoids
+// inline env vars in npm scripts, which cmd.exe cannot parse on Windows).
+process.env.FASTIFY_AUTOLOAD_TYPESCRIPT ??= '1';
+
 const config = {
   import: ['tests/support/**/*.ts', 'tests/**/*.steps.ts'],
   paths: ['tests/**/*.feature'],

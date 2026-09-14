@@ -38,13 +38,6 @@
         "npmPublish": false
       }
     ],
-    [
-      "@semantic-release/npm",
-      {
-        "npmPublish": true,
-        "pkgRoot": "client"
-      }
-    ],
     "@semantic-release/git",
     "@semantic-release/github"
   ]

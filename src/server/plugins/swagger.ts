@@ -9,14 +9,13 @@ async function swaggerGeneratorPlugin(fastify: FastifyInstance) {
     openapi: {
       openapi: '3.1.0',
       info: {
-        title: 'fastify-boilerplate',
-        description: 'The Swagger API documentation for the fastify-boilerplate project.',
+        title: 'openMessage',
+        description: 'openMessage backend API documentation.',
         version: process.env.npm_package_version ?? '0.0.0',
       },
     },
     // Document the shared error envelope once, globally, as the `4XX`/`5XX` range
-    // responses for every schema-bearing route (also flows into the generated client
-    // types). Ranges say "any client/server error looks like this" — clearer than the
+    // responses for every schema-bearing route. Ranges say "any client/server error looks like this" — clearer than the
     // catch-all `default`, which also implies undeclared success codes. This runs at
     // doc-build time only — it does NOT touch runtime serialization, so success
     // responses stay intact. Routes may still declare a specific code (409, 404) that
@@ -32,18 +31,6 @@ async function swaggerGeneratorPlugin(fastify: FastifyInstance) {
         },
       },
     }),
-    // If you don't need to generate client types you could keep swagger
-    // swagger: {
-    //   info: {
-    //     title: 'fastify-boilerplate',
-    //     description:
-    //       'The Swagger API documentation for the fastify-boilerplate project.',
-    //     version: '0.1.0',
-    //   },
-    //   schemes: ['http', 'https'],
-    //   consumes: ['application/json'],
-    //   produces: ['application/json'],
-    // },
   });
 
   await fastify.register(SwaggerUI, {

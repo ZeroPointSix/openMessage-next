@@ -1,6 +1,6 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
 
-const apiLayerPaths = ['dtos', 'dto\\.ts$', 'route\\.ts$', 'resolver\\.ts$'];
+const apiLayerPaths = ['dtos', 'dto\\.ts$', 'route\\.ts$'];
 
 const applicationLayerPaths = [
   'application',
@@ -96,6 +96,77 @@ module.exports = {
       },
     },
 
+    /* openMessage skeleton boundaries — see AGENTS.md 「服务基础设施」 */
+    {
+      name: 'no-modules-to-delivery-or-composition',
+      comment:
+        'modules/ holds business code. It must not depend on the delivery layer ' +
+        '(interfaces/) or the composition root (server/).',
+      severity: 'error',
+      from: { path: '^src/modules/' },
+      to: { path: ['^src/interfaces/', '^src/server/'] },
+    },
+    {
+      name: 'no-modules-to-delivery-sdks',
+      comment:
+        'Business code must not take a runtime dependency on delivery/provider SDKs ' +
+        '(Fastify, Mercurius/GraphQL, MCP, channel SDKs). Type-only imports are tolerated.',
+      severity: 'error',
+      from: { path: '^src/modules/' },
+      to: {
+        dependencyTypesNot: ['type-only'],
+        path: 'node_modules/(?:fastify|@fastify|mercurius|graphql|@modelcontextprotocol|@telegraf|grammy|@slack|@larksuiteoapi|discord\\.js)/',
+      },
+    },
+    {
+      name: 'no-interfaces-to-persistence',
+      comment:
+        'interfaces/ is the delivery layer. It must not depend on concrete persistence ' +
+        '— go through CQRS buses and module public APIs instead.',
+      severity: 'error',
+      from: { path: '^src/interfaces/' },
+      to: { path: ['^src/shared/db/', '[.]repository[.]ts$'] },
+    },
+    {
+      name: 'no-server-to-module-internals',
+      comment:
+        'server/ is the composition root: it wires plugins and the modules registry ' +
+        '(modules/index.ts), never business module internals.',
+      severity: 'error',
+      from: { path: '^src/server/' },
+      to: { path: '^src/modules/', pathNot: ['^src/modules/index[.]ts$'] },
+    },
+    {
+      name: 'no-adapters-to-delivery-or-composition',
+      comment:
+        'adapters/ holds outbound integrations. It must not depend on the delivery ' +
+        'layer (interfaces/) or the composition root (server/).',
+      severity: 'error',
+      from: { path: '^src/adapters/' },
+      to: { path: ['^src/interfaces/', '^src/server/'] },
+    },
+    {
+      name: 'no-low-level-to-upper-layers',
+      comment:
+        'shared/ and config/ are leaf primitives — they must not depend on business ' +
+        'modules, adapters, interfaces or server.',
+      severity: 'error',
+      from: { path: ['^src/shared/', '^src/config/'] },
+      to: { path: ['^src/modules/', '^src/interfaces/', '^src/adapters/', '^src/server/'] },
+    },
+    {
+      name: 'module-public-api-only',
+      comment:
+        'Code outside a module may only import its public entry (index.ts) or domain ' +
+        'events (*.events.ts); module internals stay private.',
+      severity: 'error',
+      from: { path: ['^src/interfaces/', '^src/adapters/'] },
+      to: {
+        path: '^src/modules/[^/]+/',
+        pathNot: ['^src/modules/[^/]+/index[.]ts$', '[.]events[.]ts$'],
+      },
+    },
+
     /* rules from the 'recommended' preset: */
     {
       name: 'no-circular',
@@ -120,7 +191,6 @@ module.exports = {
       from: {
         orphan: true,
         pathNot: [
-          '[.]graphql-schema[.]ts', // graphql schemas
           '(^|/)[.][^/]+[.](?:js|cjs|mjs|ts|cts|mts|json)$', // dot files
           '[.]d[.]ts$', // TypeScript declaration files
           '(^|/)tsconfig[.]json$', // TypeScript config
