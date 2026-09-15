@@ -61,7 +61,7 @@ export class PostgresMessageReadStore implements MessageReadStore {
       SELECT message_id, position::text AS position
       FROM interaction_messages
       WHERE interaction_id = ${interactionId}
-      ORDER BY position ASC
+      ORDER BY interaction_messages.position ASC
     `;
 
     return {
