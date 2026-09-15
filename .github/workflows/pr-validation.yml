@@ -1,0 +1,62 @@
+name: PR Validation
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check formatting and static analysis
+        run: pnpm exec biome check .
+      - name: Typecheck
+        run: pnpm type:check
+      - name: Run unit tests
+        run: pnpm test
+      - name: Validate dependency boundaries
+        run: pnpm deps:validate
+
+  docker:
+    name: Docker build and smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Build image
+        run: docker build --tag openmessage-next:pr .
+      - name: Start container
+        run: docker run --detach --name openmessage-next-pr --env-file .env.example --publish 3000:3000 openmessage-next:pr
+      - name: Check health
+        run: |
+          for attempt in {1..30}; do
+            response="$(curl --silent --show-error --fail http://127.0.0.1:3000/health || true)"
+            if [ -n "$response" ]; then
+              printf '%s\n' "$response"
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs openmessage-next-pr
+          exit 1
+      - name: Stop container
+        if: always()
+        run: docker rm --force openmessage-next-pr
