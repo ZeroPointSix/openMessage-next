@@ -1,3 +1,9 @@
+export type {
+  EgressAdapter,
+  EgressEnvelope,
+  EgressLogger,
+  MessageDispatcher,
+} from './application/message-egress.ts';
 export {
   GetInteractionService,
   GetMessageService,

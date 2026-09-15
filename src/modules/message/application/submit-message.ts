@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { MessageDispatcher } from './message-egress.ts';
 
 export interface SubmitMessageCommand {
   interactionId?: string;
@@ -58,6 +59,7 @@ export class SubmitMessageError extends Error {
 interface SubmitMessageDependencies {
   endpointResolver: EndpointResolver;
   store: SubmitMessageStore;
+  dispatcher: MessageDispatcher;
   idFactory?: () => string;
   now?: () => Date;
 }
@@ -65,17 +67,20 @@ interface SubmitMessageDependencies {
 export class SubmitMessageService {
   readonly #endpointResolver: EndpointResolver;
   readonly #store: SubmitMessageStore;
+  readonly #dispatcher: MessageDispatcher;
   readonly #idFactory: () => string;
   readonly #now: () => Date;
 
   constructor({
     endpointResolver,
     store,
+    dispatcher,
     idFactory = randomUUID,
     now = () => new Date(),
   }: SubmitMessageDependencies) {
     this.#endpointResolver = endpointResolver;
     this.#store = store;
+    this.#dispatcher = dispatcher;
     this.#idFactory = idFactory;
     this.#now = now;
   }
@@ -100,6 +105,7 @@ export class SubmitMessageService {
     const createInteraction = command.interactionId === undefined;
     const interactionId = command.interactionId ?? this.#idFactory();
     const messageId = this.#idFactory();
+    const createdAt = this.#now();
 
     await this.#store.commit({
       messageId,
@@ -108,7 +114,18 @@ export class SubmitMessageService {
       origin: command.message.origin,
       destination: command.message.destination,
       content: command.message.content,
-      createdAt: this.#now(),
+      createdAt,
+    });
+
+    this.#dispatcher.dispatch({
+      interactionId,
+      message: {
+        id: messageId,
+        origin: command.message.origin,
+        destination: command.message.destination,
+        content: command.message.content,
+        createdAt: createdAt.toISOString(),
+      },
     });
 
     return { messageId, interactionId };

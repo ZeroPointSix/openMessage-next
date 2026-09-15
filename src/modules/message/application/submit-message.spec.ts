@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   type CommitMessageInput,
+  type EgressEnvelope,
   type EndpointResolver,
   type EndpointRoute,
+  type MessageDispatcher,
   SubmitMessageError,
   SubmitMessageService,
   type SubmitMessageStore,
@@ -26,6 +28,14 @@ class ResolverStub implements EndpointResolver {
   }
 }
 
+class DispatcherStub implements MessageDispatcher {
+  deliveries: EgressEnvelope[] = [];
+
+  dispatch(envelope: EgressEnvelope): void {
+    this.deliveries.push(envelope);
+  }
+}
+
 class StoreStub implements SubmitMessageStore {
   commits: CommitMessageInput[] = [];
   error: Error | undefined;
@@ -41,10 +51,12 @@ class StoreStub implements SubmitMessageStore {
 function createHarness(ids = ['interaction-generated', 'message-generated']) {
   const resolver = new ResolverStub();
   const store = new StoreStub();
+  const dispatcher = new DispatcherStub();
   const remainingIds = [...ids];
   const service = new SubmitMessageService({
     endpointResolver: resolver,
     store,
+    dispatcher,
     idFactory: () => {
       const id = remainingIds.shift();
       assert.ok(id);
@@ -52,7 +64,7 @@ function createHarness(ids = ['interaction-generated', 'message-generated']) {
     },
     now: () => new Date('2026-09-15T00:00:00.000Z'),
   });
-  return { resolver, service, store };
+  return { dispatcher, resolver, service, store };
 }
 
 function command(interactionId?: string) {
@@ -67,7 +79,7 @@ function command(interactionId?: string) {
 }
 
 test('creates a new interaction and persists its first message', async () => {
-  const { service, store } = createHarness();
+  const { dispatcher, service, store } = createHarness();
 
   const result = await service.execute(command());
 
@@ -85,6 +97,18 @@ test('creates a new interaction and persists its first message', async () => {
     content: 'hello',
     createdAt: new Date('2026-09-15T00:00:00.000Z'),
   });
+  assert.deepEqual(dispatcher.deliveries, [
+    {
+      interactionId: 'interaction-generated',
+      message: {
+        id: 'message-generated',
+        origin: 'origin-1',
+        destination: 'destination-1',
+        content: 'hello',
+        createdAt: '2026-09-15T00:00:00.000Z',
+      },
+    },
+  ]);
 });
 
 test('appends to an existing interaction', async () => {

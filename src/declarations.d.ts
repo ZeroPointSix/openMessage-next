@@ -12,6 +12,7 @@ import type {
   UpdateEndpointService,
 } from '#src/modules/endpoint/index.ts';
 import { Dependencies as InfrastructureDependencies } from '#src/modules/index.ts';
+import type { SubmitMessageService } from '#src/modules/message/index.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -19,6 +20,7 @@ declare module 'fastify' {
     getEndpoint: GetEndpointService;
     updateEndpoint: UpdateEndpointService;
     endpointConfigToken: string;
+    submitMessage: SubmitMessageService;
   }
 }
 
