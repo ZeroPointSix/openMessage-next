@@ -36,15 +36,17 @@ test('persists endpoint config and resolves updates without restarting', {
     assert.deepEqual(await createEndpoint.execute(initial), initial);
     assert.deepEqual(await getEndpoint.execute(endpointId), initial);
 
-    const updated = {
-      ...initial,
+    const afterAddressUpdate = await updateEndpoint.execute({
+      endpointId,
       address: 'https://new.example.test/messages',
-    };
-    await updateEndpoint.execute(updated);
-    assert.deepEqual(await resolveEndpoint.execute(endpointId), updated);
+    });
+    assert.deepEqual(await resolveEndpoint.execute(endpointId), afterAddressUpdate);
 
-    await updateEndpoint.execute({ ...updated, enabled: false });
-    assert.deepEqual(await getEndpoint.execute(endpointId), { ...updated, enabled: false });
+    await updateEndpoint.execute({ endpointId, enabled: false });
+    assert.deepEqual(await getEndpoint.execute(endpointId), {
+      ...afterAddressUpdate,
+      enabled: false,
+    });
     await assert.rejects(resolveEndpoint.execute(endpointId), (error: unknown) => {
       return error instanceof EndpointRegistryError && error.code === 'ENDPOINT_DISABLED';
     });

@@ -21,11 +21,11 @@ import endpointRoutes from '../endpoints.route.ts';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
-test('HTTP endpoint update is immediately visible and blocks a new submission when disabled', {
+test('concurrent HTTP patches preserve disabled and block a new submission', {
   skip: databaseUrl === undefined,
 }, async () => {
   assert.ok(databaseUrl);
-  const db = postgres(databaseUrl, { max: 2 });
+  const db = postgres(databaseUrl, { max: 3 });
   const store = new PostgresEndpointStore(db);
   const app = Fastify({ ajv: { customOptions: { keywords: ['example'] } } });
   app.decorate('createEndpoint', new CreateEndpointService({ store }));
@@ -55,13 +55,22 @@ test('HTTP endpoint update is immediately visible and blocks a new submission wh
     });
     assert.equal(created.statusCode, 201);
 
-    const updated = await app.inject({
-      method: 'PATCH',
-      url: `/v1/endpoints/${endpointId}`,
-      headers,
-      payload: { address: 'https://new.test/messages', enabled: false },
-    });
-    assert.equal(updated.statusCode, 200);
+    const [disabled, addressUpdated] = await Promise.all([
+      app.inject({
+        method: 'PATCH',
+        url: `/v1/endpoints/${endpointId}`,
+        headers,
+        payload: { enabled: false },
+      }),
+      app.inject({
+        method: 'PATCH',
+        url: `/v1/endpoints/${endpointId}`,
+        headers,
+        payload: { address: 'https://new.test/messages' },
+      }),
+    ]);
+    assert.equal(disabled.statusCode, 200);
+    assert.equal(addressUpdated.statusCode, 200);
 
     const resolved = await store.findById(endpointId);
     assert.equal(resolved?.address, 'https://new.test/messages');

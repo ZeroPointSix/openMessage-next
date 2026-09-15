@@ -12,6 +12,7 @@ const endpointId = Type.String({
 });
 const address = Type.String({
   minLength: 8,
+  format: 'uri',
   pattern: '^https?://',
   example: 'https://b.example.com/openmessage',
 });
@@ -119,9 +120,7 @@ export default async function endpointRoutes(fastify: FastifyRouteInstance) {
     },
     async (request, reply) => {
       try {
-        const current = await fastify.getEndpoint.execute(request.params.endpointId);
         return await fastify.updateEndpoint.execute({
-          ...current,
           ...request.body,
           endpointId: request.params.endpointId,
         });

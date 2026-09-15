@@ -7,6 +7,7 @@ import {
   type EndpointStore,
   GetEndpointService,
   ResolveEndpointService,
+  type UpdateEndpointCommand,
   UpdateEndpointService,
 } from '../index.ts';
 
@@ -28,12 +29,14 @@ class MemoryEndpointStore implements EndpointStore {
     return endpoint ? { ...endpoint } : undefined;
   }
 
-  async update(endpoint: EndpointRoute): Promise<boolean> {
-    if (!this.endpoints.has(endpoint.endpointId)) {
-      return false;
+  async update(command: UpdateEndpointCommand): Promise<EndpointRoute | undefined> {
+    const current = this.endpoints.get(command.endpointId);
+    if (!current) {
+      return undefined;
     }
-    this.endpoints.set(endpoint.endpointId, { ...endpoint });
-    return true;
+    const updated = { ...current, ...command };
+    this.endpoints.set(command.endpointId, updated);
+    return { ...updated };
   }
 }
 
@@ -76,15 +79,13 @@ test('updates the route and resolves the new address immediately', async () => {
   const resolveEndpoint = new ResolveEndpointService({ store });
   await createEndpoint.execute(endpoint);
 
-  await updateEndpoint.execute({
-    ...endpoint,
+  const updated = await updateEndpoint.execute({
+    endpointId: endpoint.endpointId,
     address: 'https://new.example.test/messages',
   });
 
-  assert.deepEqual(await resolveEndpoint.execute(endpoint.endpointId), {
-    ...endpoint,
-    address: 'https://new.example.test/messages',
-  });
+  assert.deepEqual(updated, { ...endpoint, address: 'https://new.example.test/messages' });
+  assert.deepEqual(await resolveEndpoint.execute(endpoint.endpointId), updated);
   assert.deepEqual(store.findCalls, [endpoint.endpointId]);
 });
 
@@ -109,7 +110,7 @@ test('returns not found when getting or updating a missing endpoint', async () =
 
   await assert.rejects(getEndpoint.execute('missing'), hasCode('ENDPOINT_NOT_FOUND'));
   await assert.rejects(
-    updateEndpoint.execute({ ...endpoint, endpointId: 'missing' }),
+    updateEndpoint.execute({ endpointId: 'missing', enabled: false }),
     hasCode('ENDPOINT_NOT_FOUND'),
   );
 });
@@ -121,6 +122,10 @@ test('validates commands before accessing the store', async () => {
 
   await assert.rejects(
     createEndpoint.execute({ ...endpoint, address: '   ' }),
+    hasCode('INVALID_REQUEST'),
+  );
+  await assert.rejects(
+    createEndpoint.execute({ ...endpoint, address: 'https://' }),
     hasCode('INVALID_REQUEST'),
   );
   await assert.rejects(resolveEndpoint.execute(''), hasCode('INVALID_REQUEST'));

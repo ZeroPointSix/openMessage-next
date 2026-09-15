@@ -6,6 +6,7 @@ import {
   type EndpointRoute,
   type EndpointStore,
   GetEndpointService,
+  type UpdateEndpointCommand,
   UpdateEndpointService,
 } from '#src/modules/endpoint/index.ts';
 import errorHandler from '#src/server/plugins/error-handler.ts';
@@ -15,6 +16,7 @@ import endpointRoutes from '../endpoints.route.ts';
 
 class MemoryEndpointStore implements EndpointStore {
   readonly values = new Map<string, EndpointRoute>();
+  readonly updateCalls: UpdateEndpointCommand[] = [];
 
   async create(endpoint: EndpointRoute) {
     if (this.values.has(endpoint.endpointId)) return false;
@@ -26,17 +28,21 @@ class MemoryEndpointStore implements EndpointStore {
     return this.values.get(endpointId);
   }
 
-  async update(endpoint: EndpointRoute) {
-    if (!this.values.has(endpoint.endpointId)) return false;
-    this.values.set(endpoint.endpointId, endpoint);
-    return true;
+  async update(command: UpdateEndpointCommand) {
+    this.updateCalls.push({ ...command });
+    const current = this.values.get(command.endpointId);
+    if (!current) return undefined;
+    const updated = { ...current, ...command };
+    this.values.set(command.endpointId, updated);
+    return updated;
   }
 }
 
 describe('endpoint config routes', () => {
   let app: FastifyInstance;
+  let store: MemoryEndpointStore;
   before(async () => {
-    const store = new MemoryEndpointStore();
+    store = new MemoryEndpointStore();
     app = Fastify({ ajv: { customOptions: { keywords: ['example'] } } });
     app.decorate('createEndpoint', new CreateEndpointService({ store }));
     app.decorate('getEndpoint', new GetEndpointService({ store }));
@@ -81,6 +87,17 @@ describe('endpoint config routes', () => {
           method: 'POST',
           url: '/v1/endpoints',
           headers,
+          payload: { id: 'x', egressAdapter: 'http', address: 'https://', enabled: true },
+        })
+      ).statusCode,
+      400,
+    );
+    assert.equal(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/v1/endpoints',
+          headers,
           payload: {
             id: 'x',
             egressAdapter: 'dynamic-code',
@@ -109,18 +126,42 @@ describe('endpoint config routes', () => {
     };
     assert.equal((await app.inject(createRequest)).statusCode, 201);
     assert.equal((await app.inject(createRequest)).statusCode, 409);
+    assert.equal(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/v1/endpoints/b',
+          headers: { authorization: 'bearer admin-token' },
+        })
+      ).statusCode,
+      200,
+    );
 
-    const updated = await app.inject({
+    const addressUpdated = await app.inject({
       method: 'PATCH',
       url: '/v1/endpoints/b',
       headers,
-      payload: { address: 'https://new.test/messages', enabled: false },
+      payload: { address: 'https://new.test/messages' },
     });
-    assert.equal(updated.statusCode, 200);
-    assert.equal(updated.json().enabled, false);
+    assert.equal(addressUpdated.statusCode, 200);
+    assert.equal(addressUpdated.json().enabled, true);
+    assert.deepEqual(store.updateCalls.at(-1), {
+      endpointId: 'b',
+      address: 'https://new.test/messages',
+    });
+
+    const disabled = await app.inject({
+      method: 'PATCH',
+      url: '/v1/endpoints/b',
+      headers,
+      payload: { enabled: false },
+    });
+    assert.equal(disabled.statusCode, 200);
+    assert.equal(disabled.json().enabled, false);
 
     const read = await app.inject({ method: 'GET', url: '/v1/endpoints/b', headers });
     assert.equal(read.json().address, 'https://new.test/messages');
+    assert.equal(read.json().enabled, false);
 
     const document = app.swagger();
     assert.ok(document.paths?.['/v1/endpoints']?.post);
