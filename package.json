@@ -1,6 +1,6 @@
 {
   "name": "openmessage-next",
-  "version": "0.2.0",
+  "version": "2.10.0",
   "description": "openMessage 后端重写母版",
   "author": "ZeroPointSix",
   "license": "MIT",
@@ -82,5 +82,10 @@
     "semantic-release": "25.0.9",
     "typescript": "6.0.3"
   },
-  "keywords": ["openmessage", "backend", "fastify", "typescript"]
+  "keywords": [
+    "openmessage",
+    "backend",
+    "fastify",
+    "typescript"
+  ]
 }
