@@ -16,6 +16,7 @@ import endpointRoutes from '../endpoints.route.ts';
 
 class MemoryEndpointStore implements EndpointStore {
   readonly values = new Map<string, EndpointRoute>();
+  readonly updateCalls: UpdateEndpointCommand[] = [];
 
   async create(endpoint: EndpointRoute) {
     if (this.values.has(endpoint.endpointId)) return false;
@@ -28,6 +29,7 @@ class MemoryEndpointStore implements EndpointStore {
   }
 
   async update(command: UpdateEndpointCommand) {
+    this.updateCalls.push({ ...command });
     const current = this.values.get(command.endpointId);
     if (!current) return undefined;
     const updated = { ...current, ...command };
@@ -38,8 +40,9 @@ class MemoryEndpointStore implements EndpointStore {
 
 describe('endpoint config routes', () => {
   let app: FastifyInstance;
+  let store: MemoryEndpointStore;
   before(async () => {
-    const store = new MemoryEndpointStore();
+    store = new MemoryEndpointStore();
     app = Fastify({ ajv: { customOptions: { keywords: ['example'] } } });
     app.decorate('createEndpoint', new CreateEndpointService({ store }));
     app.decorate('getEndpoint', new GetEndpointService({ store }));
@@ -134,17 +137,31 @@ describe('endpoint config routes', () => {
       200,
     );
 
-    const updated = await app.inject({
+    const addressUpdated = await app.inject({
       method: 'PATCH',
       url: '/v1/endpoints/b',
       headers,
-      payload: { address: 'https://new.test/messages', enabled: false },
+      payload: { address: 'https://new.test/messages' },
     });
-    assert.equal(updated.statusCode, 200);
-    assert.equal(updated.json().enabled, false);
+    assert.equal(addressUpdated.statusCode, 200);
+    assert.equal(addressUpdated.json().enabled, true);
+    assert.deepEqual(store.updateCalls.at(-1), {
+      endpointId: 'b',
+      address: 'https://new.test/messages',
+    });
+
+    const disabled = await app.inject({
+      method: 'PATCH',
+      url: '/v1/endpoints/b',
+      headers,
+      payload: { enabled: false },
+    });
+    assert.equal(disabled.statusCode, 200);
+    assert.equal(disabled.json().enabled, false);
 
     const read = await app.inject({ method: 'GET', url: '/v1/endpoints/b', headers });
     assert.equal(read.json().address, 'https://new.test/messages');
+    assert.equal(read.json().enabled, false);
 
     const document = app.swagger();
     assert.ok(document.paths?.['/v1/endpoints']?.post);
