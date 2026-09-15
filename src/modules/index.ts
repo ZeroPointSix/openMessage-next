@@ -1,3 +1,5 @@
+export * from './endpoint/index.ts';
+
 import { asValue } from 'awilix';
 import type { FastifyBaseLogger } from 'fastify';
 import type postgres from 'postgres';
