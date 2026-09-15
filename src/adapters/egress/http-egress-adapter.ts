@@ -25,6 +25,7 @@ export class HttpEgressAdapter implements EgressAdapter {
   async deliver(address: string, envelope: EgressEnvelope): Promise<void> {
     const response = await this.#fetch(address, {
       method: 'POST',
+      redirect: 'manual',
       headers: {
         'content-type': 'application/json',
       },

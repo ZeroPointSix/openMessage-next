@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createServer, type Server } from 'node:http';
 import test from 'node:test';
 import type { EgressEnvelope } from '#src/modules/message/index.ts';
 import { HttpEgressAdapter } from './http-egress-adapter.ts';
@@ -30,9 +31,60 @@ test('posts the exact message envelope as JSON', async () => {
 
   assert.equal(receivedAddress, 'https://example.test/messages');
   assert.equal(receivedInit?.method, 'POST');
+  assert.equal(receivedInit?.redirect, 'manual');
   assert.deepEqual(receivedInit?.headers, { 'content-type': 'application/json' });
   assert.equal(receivedInit?.body, JSON.stringify(envelope));
   assert.ok(receivedInit?.signal instanceof AbortSignal);
+});
+
+async function listen(server: Server): Promise<string> {
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  return `http://127.0.0.1:${address.port}`;
+}
+
+async function close(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+}
+
+test('does not follow redirect responses', async () => {
+  for (const status of [301, 302, 303, 307, 308]) {
+    let configuredEndpointRequests = 0;
+    let redirectTargetRequests = 0;
+    const redirectTarget = createServer((_request, response) => {
+      redirectTargetRequests += 1;
+      response.writeHead(204).end();
+    });
+    const redirectTargetAddress = await listen(redirectTarget);
+    const configuredEndpoint = createServer((_request, response) => {
+      configuredEndpointRequests += 1;
+      response.writeHead(status, { location: `${redirectTargetAddress}/redirected` }).end();
+    });
+    const configuredEndpointAddress = await listen(configuredEndpoint);
+
+    try {
+      const adapter = new HttpEgressAdapter({ timeoutMs: 5000 });
+
+      await assert.rejects(
+        adapter.deliver(`${configuredEndpointAddress}/messages`, envelope),
+        new RegExp(`HTTP egress returned status ${status}`),
+      );
+
+      assert.equal(configuredEndpointRequests, 1);
+      assert.equal(redirectTargetRequests, 0);
+    } finally {
+      await Promise.all([close(configuredEndpoint), close(redirectTarget)]);
+    }
+  }
 });
 
 test('rejects a non-success HTTP response without reading its body', async () => {
