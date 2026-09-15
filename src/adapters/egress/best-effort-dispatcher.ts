@@ -1,6 +1,7 @@
 import type {
   EgressAdapter,
   EgressEnvelope,
+  EgressFailureError,
   EgressLogger,
   EndpointResolver,
   MessageDispatcher,
@@ -35,7 +36,9 @@ export class BestEffortDispatcher implements MessageDispatcher {
           interactionId: envelope.interactionId,
           destination: envelope.message.destination,
           adapter: adapterName,
-          error: errorMessage(error),
+          // Plain object so Fastify/pino JSON keeps the failure details. The
+          // default serializer only expands the `err` key; Linear requires `error`.
+          error: toLoggableError(error),
         },
         'Best-effort egress delivery failed',
       );
@@ -61,6 +64,17 @@ export class BestEffortDispatcher implements MessageDispatcher {
   }
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function toLoggableError(error: unknown): EgressFailureError {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      ...(error.stack === undefined ? {} : { stack: error.stack }),
+    };
+  }
+
+  return {
+    name: 'Error',
+    message: String(error),
+  };
 }

@@ -95,9 +95,62 @@ test('contains delivery rejection and emits structured metadata', async () => {
     interactionId: 'interaction-1',
     destination: 'destination-1',
     adapter: 'http',
-    error: 'connection failed',
+    error: {
+      name: 'Error',
+      message: 'connection failed',
+      stack: adapter.error.stack,
+    },
   });
   assert.equal(logger.errors[0]?.message, 'Best-effort egress delivery failed');
+});
+
+test('keeps failure details when Fastify/pino serializes the error binding', async () => {
+  const { Writable } = await import('node:stream');
+  const Fastify = (await import('fastify')).default;
+  let buf = '';
+  const stream = new Writable({
+    write(chunk, _encoding, callback) {
+      buf += chunk.toString();
+      callback();
+    },
+  });
+  const app = Fastify({ logger: { level: 'error', stream } });
+  const resolver = new ResolverStub();
+  const adapter = new AdapterStub();
+  adapter.error = new Error('connection failed');
+  const dispatcher = new BestEffortDispatcher({
+    endpointResolver: resolver,
+    adapters: new Map([['http', adapter]]),
+    logger: app.log,
+  });
+
+  dispatcher.dispatch(envelope);
+  await flush();
+  await app.close();
+
+  const line = buf
+    .trim()
+    .split('\n')
+    .map(
+      (entry) =>
+        JSON.parse(entry) as {
+          messageId?: string;
+          interactionId?: string;
+          destination?: string;
+          adapter?: string;
+          error?: { name?: string; message?: string };
+          msg?: string;
+        },
+    )
+    .find((entry) => entry.msg === 'Best-effort egress delivery failed');
+
+  assert.ok(line);
+  assert.equal(line.messageId, 'message-1');
+  assert.equal(line.interactionId, 'interaction-1');
+  assert.equal(line.destination, 'destination-1');
+  assert.equal(line.adapter, 'http');
+  assert.equal(line.error?.name, 'Error');
+  assert.equal(line.error?.message, 'connection failed');
 });
 
 test('logs unsupported adapters without attempting delivery', async () => {
@@ -114,5 +167,5 @@ test('logs unsupported adapters without attempting delivery', async () => {
   await flush();
 
   assert.equal(logger.errors[0]?.bindings.adapter, 'missing');
-  assert.match(logger.errors[0]?.bindings.error ?? '', /Unsupported egress adapter/);
+  assert.match(logger.errors[0]?.bindings.error.message ?? '', /Unsupported egress adapter/);
 });

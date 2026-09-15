@@ -17,6 +17,12 @@ export interface MessageDispatcher {
   dispatch(envelope: EgressEnvelope): void;
 }
 
+export interface EgressFailureError {
+  name: string;
+  message: string;
+  stack?: string;
+}
+
 export interface EgressLogger {
   error(
     bindings: {
@@ -24,7 +30,7 @@ export interface EgressLogger {
       interactionId: string;
       destination: string;
       adapter: string;
-      error: string;
+      error: EgressFailureError;
     },
     message: string,
   ): void;
