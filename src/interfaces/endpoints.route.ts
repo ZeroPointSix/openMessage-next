@@ -12,6 +12,7 @@ const endpointId = Type.String({
 });
 const address = Type.String({
   minLength: 8,
+  format: 'uri',
   pattern: '^https?://',
   example: 'https://b.example.com/openmessage',
 });
@@ -119,9 +120,7 @@ export default async function endpointRoutes(fastify: FastifyRouteInstance) {
     },
     async (request, reply) => {
       try {
-        const current = await fastify.getEndpoint.execute(request.params.endpointId);
         return await fastify.updateEndpoint.execute({
-          ...current,
           ...request.body,
           endpointId: request.params.endpointId,
         });
@@ -147,14 +146,15 @@ async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   }
 
   const authorization = request.headers.authorization;
-  if (!authorization?.startsWith('Bearer ') || authorization.length === 7) {
+  const token = /^Bearer +([^ ]+)$/i.exec(authorization ?? '')?.[1];
+  if (!token) {
     return reply
       .header('www-authenticate', 'Bearer')
       .status(401)
       .send(errorBody(401, 'Unauthorized', 'Bearer token is required', request.id));
   }
 
-  const provided = createHash('sha256').update(authorization.slice(7)).digest();
+  const provided = createHash('sha256').update(token).digest();
   const expected = createHash('sha256').update(request.server.endpointConfigToken).digest();
   if (!timingSafeEqual(provided, expected)) {
     return reply

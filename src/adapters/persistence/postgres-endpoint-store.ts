@@ -1,5 +1,9 @@
 import type postgres from 'postgres';
-import type { EndpointRoute, EndpointStore } from '#src/modules/endpoint/index.ts';
+import type {
+  EndpointRoute,
+  EndpointStore,
+  UpdateEndpointCommand,
+} from '#src/modules/endpoint/index.ts';
 
 type Database = ReturnType<typeof postgres>;
 
@@ -42,16 +46,17 @@ export class PostgresEndpointStore implements EndpointStore {
     return row ? toRoute(row) : undefined;
   }
 
-  async update(endpoint: EndpointRoute): Promise<boolean> {
-    const rows = await this.#db<{ id: string }[]>`
+  async update(command: UpdateEndpointCommand): Promise<EndpointRoute | undefined> {
+    const rows = await this.#db<EndpointRow[]>`
       UPDATE endpoints
-      SET egress_adapter = ${endpoint.egressAdapter},
-          address = ${endpoint.address},
-          enabled = ${endpoint.enabled}
-      WHERE id = ${endpoint.endpointId}
-      RETURNING id
+      SET egress_adapter = COALESCE(${command.egressAdapter ?? null}, egress_adapter),
+          address = COALESCE(${command.address ?? null}, address),
+          enabled = COALESCE(${command.enabled ?? null}, enabled)
+      WHERE id = ${command.endpointId}
+      RETURNING id, egress_adapter, address, enabled
     `;
-    return rows.length === 1;
+    const row = rows[0];
+    return row ? toRoute(row) : undefined;
   }
 }
 

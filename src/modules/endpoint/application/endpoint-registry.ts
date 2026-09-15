@@ -14,15 +14,15 @@ export interface CreateEndpointCommand {
 
 export interface UpdateEndpointCommand {
   endpointId: string;
-  egressAdapter: string;
-  address: string;
-  enabled: boolean;
+  egressAdapter?: string;
+  address?: string;
+  enabled?: boolean;
 }
 
 export interface EndpointStore {
   create(endpoint: EndpointRoute): Promise<boolean>;
   findById(endpointId: string): Promise<EndpointRoute | undefined>;
-  update(endpoint: EndpointRoute): Promise<boolean>;
+  update(command: UpdateEndpointCommand): Promise<EndpointRoute | undefined>;
 }
 
 export type EndpointRegistryErrorCode =
@@ -53,7 +53,7 @@ export class CreateEndpointService {
   }
 
   async execute(command: CreateEndpointCommand): Promise<EndpointRoute> {
-    validateEndpoint(command);
+    validateCreateEndpoint(command);
     const endpoint = toRoute(command);
 
     if (!(await this.#store.create(endpoint))) {
@@ -96,10 +96,10 @@ export class UpdateEndpointService {
   }
 
   async execute(command: UpdateEndpointCommand): Promise<EndpointRoute> {
-    validateEndpoint(command);
-    const endpoint = toRoute(command);
+    validateUpdateEndpoint(command);
+    const endpoint = await this.#store.update(command);
 
-    if (!(await this.#store.update(endpoint))) {
+    if (!endpoint) {
       throw endpointNotFound(command.endpointId);
     }
 
@@ -129,13 +129,52 @@ export class ResolveEndpointService {
   }
 }
 
-function validateEndpoint(command: CreateEndpointCommand | UpdateEndpointCommand): void {
+function validateCreateEndpoint(command: CreateEndpointCommand): void {
   assertNonBlank(command.endpointId, 'endpointId');
   assertNonBlank(command.egressAdapter, 'egressAdapter');
-  assertNonBlank(command.address, 'address');
+  assertEndpointAddress(command.address);
   if (typeof command.enabled !== 'boolean') {
     throw new EndpointRegistryError('INVALID_REQUEST', 'enabled must be a boolean');
   }
+}
+
+function validateUpdateEndpoint(command: UpdateEndpointCommand): void {
+  assertNonBlank(command.endpointId, 'endpointId');
+  if (
+    command.egressAdapter === undefined &&
+    command.address === undefined &&
+    command.enabled === undefined
+  ) {
+    throw new EndpointRegistryError('INVALID_REQUEST', 'at least one endpoint field is required');
+  }
+  if (command.egressAdapter !== undefined) {
+    assertNonBlank(command.egressAdapter, 'egressAdapter');
+  }
+  if (command.address !== undefined) {
+    assertEndpointAddress(command.address);
+  }
+  if (command.enabled !== undefined && typeof command.enabled !== 'boolean') {
+    throw new EndpointRegistryError('INVALID_REQUEST', 'enabled must be a boolean');
+  }
+}
+
+function assertEndpointAddress(value: string): void {
+  assertNonBlank(value, 'address');
+  try {
+    const parsed = new URL(value);
+    if (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      parsed.hostname.length > 0
+    ) {
+      return;
+    }
+  } catch {
+    // Report a stable validation error below.
+  }
+  throw new EndpointRegistryError(
+    'INVALID_REQUEST',
+    'address must be a valid HTTP(S) URL with a host',
+  );
 }
 
 function assertNonBlank(value: string, field: string): void {
@@ -148,7 +187,7 @@ function endpointNotFound(endpointId: string): EndpointRegistryError {
   return new EndpointRegistryError('ENDPOINT_NOT_FOUND', `Endpoint ${endpointId} does not exist`);
 }
 
-function toRoute(command: CreateEndpointCommand | UpdateEndpointCommand): EndpointRoute {
+function toRoute(command: CreateEndpointCommand): EndpointRoute {
   return {
     endpointId: command.endpointId,
     egressAdapter: command.egressAdapter,

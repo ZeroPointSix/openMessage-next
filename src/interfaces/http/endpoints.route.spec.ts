@@ -6,6 +6,7 @@ import {
   type EndpointRoute,
   type EndpointStore,
   GetEndpointService,
+  type UpdateEndpointCommand,
   UpdateEndpointService,
 } from '#src/modules/endpoint/index.ts';
 import errorHandler from '#src/server/plugins/error-handler.ts';
@@ -26,10 +27,12 @@ class MemoryEndpointStore implements EndpointStore {
     return this.values.get(endpointId);
   }
 
-  async update(endpoint: EndpointRoute) {
-    if (!this.values.has(endpoint.endpointId)) return false;
-    this.values.set(endpoint.endpointId, endpoint);
-    return true;
+  async update(command: UpdateEndpointCommand) {
+    const current = this.values.get(command.endpointId);
+    if (!current) return undefined;
+    const updated = { ...current, ...command };
+    this.values.set(command.endpointId, updated);
+    return updated;
   }
 }
 
@@ -81,6 +84,17 @@ describe('endpoint config routes', () => {
           method: 'POST',
           url: '/v1/endpoints',
           headers,
+          payload: { id: 'x', egressAdapter: 'http', address: 'https://', enabled: true },
+        })
+      ).statusCode,
+      400,
+    );
+    assert.equal(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/v1/endpoints',
+          headers,
           payload: {
             id: 'x',
             egressAdapter: 'dynamic-code',
@@ -109,6 +123,16 @@ describe('endpoint config routes', () => {
     };
     assert.equal((await app.inject(createRequest)).statusCode, 201);
     assert.equal((await app.inject(createRequest)).statusCode, 409);
+    assert.equal(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/v1/endpoints/b',
+          headers: { authorization: 'bearer admin-token' },
+        })
+      ).statusCode,
+      200,
+    );
 
     const updated = await app.inject({
       method: 'PATCH',
