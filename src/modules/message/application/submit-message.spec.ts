@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { setImmediate as flush } from 'node:timers/promises';
+import { BestEffortDispatcher } from '#src/adapters/egress/best-effort-dispatcher.ts';
 import {
   type CommitMessageInput,
+  type EgressEnvelope,
   type EndpointResolver,
   type EndpointRoute,
+  type MessageDispatcher,
   SubmitMessageError,
   SubmitMessageService,
   type SubmitMessageStore,
@@ -26,14 +30,26 @@ class ResolverStub implements EndpointResolver {
   }
 }
 
+class DispatcherStub implements MessageDispatcher {
+  deliveries: EgressEnvelope[] = [];
+
+  dispatch(envelope: EgressEnvelope): void {
+    this.deliveries.push(envelope);
+  }
+}
+
 class StoreStub implements SubmitMessageStore {
   commits: CommitMessageInput[] = [];
+  startedCommits: CommitMessageInput[] = [];
+  gate: Promise<void> | undefined;
   error: Error | undefined;
 
   async commit(input: CommitMessageInput): Promise<void> {
+    this.startedCommits.push(input);
     if (this.error) {
       throw this.error;
     }
+    await this.gate;
     this.commits.push(input);
   }
 }
@@ -41,10 +57,12 @@ class StoreStub implements SubmitMessageStore {
 function createHarness(ids = ['interaction-generated', 'message-generated']) {
   const resolver = new ResolverStub();
   const store = new StoreStub();
+  const dispatcher = new DispatcherStub();
   const remainingIds = [...ids];
   const service = new SubmitMessageService({
     endpointResolver: resolver,
     store,
+    dispatcher,
     idFactory: () => {
       const id = remainingIds.shift();
       assert.ok(id);
@@ -52,7 +70,7 @@ function createHarness(ids = ['interaction-generated', 'message-generated']) {
     },
     now: () => new Date('2026-09-15T00:00:00.000Z'),
   });
-  return { resolver, service, store };
+  return { dispatcher, resolver, service, store };
 }
 
 function command(interactionId?: string) {
@@ -67,7 +85,7 @@ function command(interactionId?: string) {
 }
 
 test('creates a new interaction and persists its first message', async () => {
-  const { service, store } = createHarness();
+  const { dispatcher, service, store } = createHarness();
 
   const result = await service.execute(command());
 
@@ -85,6 +103,18 @@ test('creates a new interaction and persists its first message', async () => {
     content: 'hello',
     createdAt: new Date('2026-09-15T00:00:00.000Z'),
   });
+  assert.deepEqual(dispatcher.deliveries, [
+    {
+      interactionId: 'interaction-generated',
+      message: {
+        id: 'message-generated',
+        origin: 'origin-1',
+        destination: 'destination-1',
+        content: 'hello',
+        createdAt: '2026-09-15T00:00:00.000Z',
+      },
+    },
+  ]);
 });
 
 test('appends to an existing interaction', async () => {
@@ -137,6 +167,67 @@ test('does not return accepted when persistence fails', async () => {
   store.error = failure;
 
   await assert.rejects(service.execute(command()), (error: unknown) => error === failure);
+});
+
+test('dispatches only after commit and returns accepted without waiting for delivery', async () => {
+  let releaseCommit: (() => void) | undefined;
+  const commitGate = new Promise<void>((resolve) => {
+    releaseCommit = resolve;
+  });
+  const resolver = new ResolverStub();
+  const store = new StoreStub();
+  store.gate = commitGate;
+  let deliveryStarted = false;
+  const dispatcher = new BestEffortDispatcher({
+    endpointResolver: resolver,
+    adapters: new Map([
+      [
+        'http',
+        {
+          async deliver(): Promise<void> {
+            deliveryStarted = true;
+            await new Promise<void>(() => undefined);
+          },
+        },
+      ],
+    ]),
+    logger: {
+      error: () => assert.fail('delivery must remain pending without logging an error'),
+    },
+  });
+  const remainingIds = ['interaction-generated', 'message-generated'];
+  const service = new SubmitMessageService({
+    endpointResolver: resolver,
+    store,
+    dispatcher,
+    idFactory: () => {
+      const id = remainingIds.shift();
+      assert.ok(id);
+      return id;
+    },
+    now: () => new Date('2026-09-15T00:00:00.000Z'),
+  });
+
+  let acceptedSettled = false;
+  const accepted = service.execute(command()).then((result) => {
+    acceptedSettled = true;
+    return result;
+  });
+  await flush();
+
+  assert.equal(store.startedCommits.length, 1);
+  assert.equal(acceptedSettled, false);
+  assert.equal(deliveryStarted, false);
+
+  releaseCommit?.();
+  const result = await accepted;
+  await flush();
+
+  assert.deepEqual(result, {
+    interactionId: 'interaction-generated',
+    messageId: 'message-generated',
+  });
+  assert.equal(deliveryStarted, true);
 });
 
 test('creates distinct message ids for duplicate submissions', async () => {

@@ -85,6 +85,7 @@ test('concurrent HTTP patches preserve disabled and block a new submission', {
     const submit = new SubmitMessageService({
       endpointResolver: { resolveEndpoint: (id) => store.findById(id) },
       store: messageStore,
+      dispatcher: { dispatch: () => assert.fail('dispatch must not run') },
     });
     await assert.rejects(
       submit.execute({
