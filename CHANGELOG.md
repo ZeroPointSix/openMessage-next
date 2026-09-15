@@ -1,3 +1,10 @@
+# [2.14.0](https://github.com/ZeroPointSix/openMessage-next/compare/v2.13.0...v2.14.0) (2026-09-15)
+
+
+### Features
+
+* add Message and Interaction HTTP ingress (ZER-1134) ([#12](https://github.com/ZeroPointSix/openMessage-next/issues/12)) ([4cab624](https://github.com/ZeroPointSix/openMessage-next/commit/4cab62440c264b3031033546b4d000bfc0040ca5))
+
 # [2.13.0](https://github.com/ZeroPointSix/openMessage-next/compare/v2.12.0...v2.13.0) (2026-09-15)
 
 
