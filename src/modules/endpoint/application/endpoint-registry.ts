@@ -127,10 +127,6 @@ export class ResolveEndpointService {
 
     return endpoint;
   }
-
-  async resolveEndpoint(endpointId: string): Promise<EndpointRoute> {
-    return this.execute(endpointId);
-  }
 }
 
 function validateEndpoint(command: CreateEndpointCommand | UpdateEndpointCommand): void {
