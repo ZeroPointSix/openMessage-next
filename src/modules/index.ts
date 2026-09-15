@@ -1,5 +1,9 @@
 export * from './endpoint/index.ts';
-export { SubmitMessageService } from './message/index.ts';
+export {
+  GetInteractionService,
+  GetMessageService,
+  SubmitMessageService,
+} from './message/index.ts';
 
 import { asValue } from 'awilix';
 import type { FastifyBaseLogger } from 'fastify';

@@ -1,8 +1,8 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { type Static, Type } from 'typebox';
 import { EndpointRegistryError } from '#src/modules/endpoint/index.ts';
 import { apiErrorResponseRef } from '#src/shared/api/api-error.response.ts';
+import { authenticateBearer } from './http/bearer-auth.ts';
 
 const endpointId = Type.String({
   minLength: 1,
@@ -133,41 +133,11 @@ export default async function endpointRoutes(fastify: FastifyRouteInstance) {
 }
 
 async function authenticate(request: FastifyRequest, reply: FastifyReply) {
-  if (request.server.endpointConfigToken.length === 0) {
-    return reply
-      .status(503)
-      .send(
-        errorBody(
-          503,
-          'Service Unavailable',
-          'Endpoint configuration authentication is not configured',
-          request.id,
-        ),
-      );
-  }
-
-  const authorization = request.headers.authorization;
-  if (!authorization?.startsWith('Bearer ') || authorization.length === 7) {
-    return reply
-      .header('www-authenticate', 'Bearer')
-      .status(401)
-      .send(errorBody(401, 'Unauthorized', 'Bearer token is required', request.id));
-  }
-
-  const provided = createHash('sha256').update(authorization.slice(7)).digest();
-  const expected = createHash('sha256').update(request.server.endpointConfigToken).digest();
-  if (!timingSafeEqual(provided, expected)) {
-    return reply
-      .status(403)
-      .send(
-        errorBody(
-          403,
-          'Forbidden',
-          'Bearer token is not authorized for endpoint configuration',
-          request.id,
-        ),
-      );
-  }
+  return authenticateBearer(request, reply, {
+    token: request.server.endpointConfigToken,
+    unconfiguredMessage: 'Endpoint configuration authentication is not configured',
+    forbiddenMessage: 'Bearer token is not authorized for endpoint configuration',
+  });
 }
 
 function sendEndpointError(
