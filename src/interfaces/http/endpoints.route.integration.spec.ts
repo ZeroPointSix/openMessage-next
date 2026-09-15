@@ -76,6 +76,7 @@ test('HTTP endpoint update is immediately visible and blocks a new submission wh
     const submit = new SubmitMessageService({
       endpointResolver: { resolveEndpoint: (id) => store.findById(id) },
       store: messageStore,
+      dispatcher: { dispatch: () => assert.fail('dispatch must not run') },
     });
     await assert.rejects(
       submit.execute({

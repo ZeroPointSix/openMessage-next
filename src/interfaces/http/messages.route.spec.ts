@@ -71,6 +71,7 @@ describe('Message and Interaction HTTP ingress', () => {
         },
       },
       store,
+      dispatcher: { dispatch: () => undefined },
       idFactory: () => `generated-${++nextId}`,
       now: () => new Date('2026-09-15T08:00:00.000Z'),
     });

@@ -27,6 +27,7 @@ const schema = Type.Object({
   POSTGRES_POOL_MAX: Type.Number({ default: 10 }),
   POSTGRES_IDLE_TIMEOUT: Type.Number({ default: 20 }),
   POSTGRES_CONNECT_TIMEOUT: Type.Number({ default: 30 }),
+  HTTP_EGRESS_TIMEOUT_MS: Type.Number({ default: 5000 }),
   LOG_LEVEL: Type.Enum(LogLevel),
   NODE_ENV: Type.Enum(NodeEnv),
   HOST: Type.String({ default: 'localhost' }),
@@ -56,5 +57,8 @@ export default {
     poolMax: env.POSTGRES_POOL_MAX,
     idleTimeout: env.POSTGRES_IDLE_TIMEOUT,
     connectTimeout: env.POSTGRES_CONNECT_TIMEOUT,
+  },
+  egress: {
+    httpTimeoutMs: env.HTTP_EGRESS_TIMEOUT_MS,
   },
 };
