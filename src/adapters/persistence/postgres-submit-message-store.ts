@@ -1,7 +1,7 @@
 import type postgres from 'postgres';
 import {
-  SubmitMessageError,
   type CommitMessageInput,
+  SubmitMessageError,
   type SubmitMessageStore,
 } from '#src/modules/message/index.ts';
 

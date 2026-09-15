@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  SubmitMessageError,
-  SubmitMessageService,
   type CommitMessageInput,
   type EndpointResolver,
   type EndpointRoute,
+  SubmitMessageError,
+  SubmitMessageService,
   type SubmitMessageStore,
 } from '../index.ts';
 

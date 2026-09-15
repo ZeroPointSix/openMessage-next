@@ -1,31 +1,31 @@
 import { randomUUID } from 'node:crypto';
 
-export type SubmitMessageCommand = {
+export interface SubmitMessageCommand {
   interactionId?: string;
   message: {
     origin: string;
     destination: string;
     content: string;
   };
-};
+}
 
-export type SubmitMessageResult = {
+export interface SubmitMessageResult {
   messageId: string;
   interactionId: string;
-};
+}
 
-export type EndpointRoute = {
+export interface EndpointRoute {
   endpointId: string;
   egressAdapter: string;
   address: string;
   enabled: boolean;
-};
+}
 
-export type EndpointResolver = {
+export interface EndpointResolver {
   resolveEndpoint(endpointId: string): Promise<EndpointRoute | undefined>;
-};
+}
 
-export type CommitMessageInput = {
+export interface CommitMessageInput {
   messageId: string;
   interactionId: string;
   createInteraction: boolean;
@@ -33,11 +33,11 @@ export type CommitMessageInput = {
   destination: string;
   content: string;
   createdAt: Date;
-};
+}
 
-export type SubmitMessageStore = {
+export interface SubmitMessageStore {
   commit(input: CommitMessageInput): Promise<void>;
-};
+}
 
 export type SubmitMessageErrorCode =
   | 'INVALID_REQUEST'
@@ -55,12 +55,12 @@ export class SubmitMessageError extends Error {
   }
 }
 
-type SubmitMessageDependencies = {
+interface SubmitMessageDependencies {
   endpointResolver: EndpointResolver;
   store: SubmitMessageStore;
   idFactory?: () => string;
   now?: () => Date;
-};
+}
 
 export class SubmitMessageService {
   readonly #endpointResolver: EndpointResolver;
