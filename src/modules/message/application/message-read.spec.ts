@@ -77,8 +77,8 @@ test('returns an ordered interaction directory of message refs only', async () =
   store.interaction = {
     id: 'interaction-1',
     messages: [
-      { messageId: 'message-1', position: 0 },
-      { messageId: 'message-2', position: 1 },
+      { messageId: 'message-1', position: '0' },
+      { messageId: 'message-2', position: '9007199254740993' },
     ],
   };
   const service = new GetInteractionService({ store });
@@ -86,8 +86,8 @@ test('returns an ordered interaction directory of message refs only', async () =
   assert.deepEqual(await service.execute('interaction-1'), {
     id: 'interaction-1',
     messages: [
-      { messageId: 'message-1', position: 0 },
-      { messageId: 'message-2', position: 1 },
+      { messageId: 'message-1', position: '0' },
+      { messageId: 'message-2', position: '9007199254740993' },
     ],
   });
 });
