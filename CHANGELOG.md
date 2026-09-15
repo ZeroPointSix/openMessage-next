@@ -1,3 +1,10 @@
+# [2.12.0](https://github.com/ZeroPointSix/openMessage-next/compare/v2.11.0...v2.12.0) (2026-09-15)
+
+
+### Features
+
+* implement Endpoint Registry with runtime hot-reloadable config ([#10](https://github.com/ZeroPointSix/openMessage-next/issues/10)) ([96f294b](https://github.com/ZeroPointSix/openMessage-next/commit/96f294b49dadc540827ad274ef0aa08abd911554))
+
 # [2.11.0](https://github.com/ZeroPointSix/openMessage-next/compare/v2.10.0...v2.11.0) (2026-09-15)
 
 
