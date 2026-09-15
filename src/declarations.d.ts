@@ -6,7 +6,21 @@ import {
   RawRequestDefaultExpression,
   RawServerDefault,
 } from 'fastify';
+import type {
+  CreateEndpointService,
+  GetEndpointService,
+  UpdateEndpointService,
+} from '#src/modules/endpoint/index.ts';
 import { Dependencies as InfrastructureDependencies } from '#src/modules/index.ts';
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    createEndpoint: CreateEndpointService;
+    getEndpoint: GetEndpointService;
+    updateEndpoint: UpdateEndpointService;
+    endpointConfigToken: string;
+  }
+}
 
 declare global {
   // Declare global DI container type

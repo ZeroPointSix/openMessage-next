@@ -19,13 +19,21 @@ export default async function createServer(fastify: FastifyInstance) {
 
   await di(fastify);
 
+  const interfacesDir = path.join(import.meta.dirname, '../interfaces');
   await fastify.register(AutoLoad, {
-    dir: path.join(import.meta.dirname, '../interfaces'),
+    dir: interfacesDir,
+    dirNameRoutePrefix: false,
+    matchFilter: (routePath) => /endpoints\.route\.ts$/.test(routePath),
+  });
+
+  await fastify.register(AutoLoad, {
+    dir: interfacesDir,
     dirNameRoutePrefix: false,
     options: {
       prefix: '/api',
     },
-    matchFilter: (routePath) => /\.route\.ts$/.test(routePath),
+    matchFilter: (routePath) =>
+      /\.route\.ts$/.test(routePath) && !/endpoints\.route\.ts$/.test(routePath),
   });
 
   await fastify.register(UnderPressure, {
