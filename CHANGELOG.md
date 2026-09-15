@@ -1,3 +1,10 @@
+# [2.15.0](https://github.com/ZeroPointSix/openMessage-next/compare/v2.14.0...v2.15.0) (2026-09-15)
+
+
+### Features
+
+* implement best-effort HTTP egress delivery ([#13](https://github.com/ZeroPointSix/openMessage-next/issues/13)) ([b1c93d2](https://github.com/ZeroPointSix/openMessage-next/commit/b1c93d2cb180e0c4e9cbc581878c5aec23201c3a))
+
 # [2.14.0](https://github.com/ZeroPointSix/openMessage-next/compare/v2.13.0...v2.14.0) (2026-09-15)
 
 
