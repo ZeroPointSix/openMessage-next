@@ -1,5 +1,7 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+
+const comparisonKey = randomBytes(32);
 
 interface BearerAuthOptions {
   token: string;
@@ -19,15 +21,16 @@ export function authenticateBearer(
   }
 
   const authorization = request.headers.authorization;
-  if (!authorization?.startsWith('Bearer ') || authorization.length === 7) {
+  const providedToken = authorization?.match(/^Bearer +(\S+)$/i)?.[1];
+  if (providedToken === undefined) {
     return reply
       .header('www-authenticate', 'Bearer')
       .status(401)
       .send(errorBody(401, 'Unauthorized', 'Bearer token is required', request.id));
   }
 
-  const provided = createHash('sha256').update(authorization.slice(7)).digest();
-  const expected = createHash('sha256').update(options.token).digest();
+  const provided = createHmac('sha256', comparisonKey).update(providedToken).digest();
+  const expected = createHmac('sha256', comparisonKey).update(options.token).digest();
   if (!timingSafeEqual(provided, expected)) {
     return reply
       .header('www-authenticate', 'Bearer')

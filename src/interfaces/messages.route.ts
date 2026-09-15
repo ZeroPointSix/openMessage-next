@@ -106,7 +106,7 @@ export default async function messageRoutes(fastify: FastifyRouteInstance) {
   fastify.post<{ Body: SubmitBody }>(
     '/v1/messages',
     {
-      preHandler: authenticate,
+      onRequest: authenticate,
       schema: {
         tags: ['Messages'],
         summary: 'Submit a message',
@@ -134,7 +134,7 @@ export default async function messageRoutes(fastify: FastifyRouteInstance) {
   fastify.get<{ Params: MessageParams }>(
     '/v1/messages/:messageId',
     {
-      preHandler: authenticate,
+      onRequest: authenticate,
       schema: {
         tags: ['Messages'],
         summary: 'Get a canonical message',
@@ -155,7 +155,7 @@ export default async function messageRoutes(fastify: FastifyRouteInstance) {
   fastify.get<{ Params: InteractionParams }>(
     '/v1/interactions/:interactionId',
     {
-      preHandler: authenticate,
+      onRequest: authenticate,
       schema: {
         tags: ['Interactions'],
         summary: 'Get an interaction directory',

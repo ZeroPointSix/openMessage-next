@@ -98,6 +98,23 @@ describe('Message and Interaction HTTP ingress', () => {
       headers: { authorization: 'Bearer wrong' },
     });
     assert.equal(forbidden.statusCode, 403);
+
+    const lowercaseScheme = await app.inject({
+      method: 'GET',
+      url: '/v1/messages/unknown',
+      headers: { authorization: 'bearer api-token' },
+    });
+    assert.equal(lowercaseScheme.statusCode, 404);
+
+    const unauthenticatedInvalidBody = await app.inject({
+      method: 'POST',
+      url: '/v1/messages',
+      payload: {
+        unexpected: true,
+        message: { origin: ' ', destination: 'endpoint-b', content: 'hello' },
+      },
+    });
+    assert.equal(unauthenticatedInvalidBody.statusCode, 401);
   });
 
   it('validates transport schemas before calling the Application API', async () => {
