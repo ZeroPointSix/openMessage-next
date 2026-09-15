@@ -35,7 +35,7 @@ export class BestEffortDispatcher implements MessageDispatcher {
           interactionId: envelope.interactionId,
           destination: envelope.message.destination,
           adapter: adapterName,
-          error,
+          error: errorMessage(error),
         },
         'Best-effort egress delivery failed',
       );
@@ -59,4 +59,8 @@ export class BestEffortDispatcher implements MessageDispatcher {
 
     await adapter.deliver(route.address, envelope);
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

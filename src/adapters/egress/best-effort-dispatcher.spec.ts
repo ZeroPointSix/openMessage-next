@@ -95,7 +95,7 @@ test('contains delivery rejection and emits structured metadata', async () => {
     interactionId: 'interaction-1',
     destination: 'destination-1',
     adapter: 'http',
-    error: adapter.error,
+    error: 'connection failed',
   });
   assert.equal(logger.errors[0]?.message, 'Best-effort egress delivery failed');
 });
@@ -114,5 +114,5 @@ test('logs unsupported adapters without attempting delivery', async () => {
   await flush();
 
   assert.equal(logger.errors[0]?.bindings.adapter, 'missing');
-  assert.match(String(logger.errors[0]?.bindings.error), /Unsupported egress adapter/);
+  assert.match(logger.errors[0]?.bindings.error ?? '', /Unsupported egress adapter/);
 });

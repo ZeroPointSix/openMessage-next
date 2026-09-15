@@ -24,7 +24,7 @@ export interface EgressLogger {
       interactionId: string;
       destination: string;
       adapter: string;
-      error: unknown;
+      error: string;
     },
     message: string,
   ): void;
