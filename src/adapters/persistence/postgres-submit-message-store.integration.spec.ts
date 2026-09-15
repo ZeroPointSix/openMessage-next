@@ -46,7 +46,7 @@ test('commits new and appended messages atomically with unique concurrent positi
       SELECT position::text AS position
       FROM interaction_messages
       WHERE interaction_id = ${interactionId}
-      ORDER BY position
+      ORDER BY interaction_messages.position
     `;
     assert.deepEqual(
       positions.map(({ position }) => Number(position)),
