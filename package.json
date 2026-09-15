@@ -82,10 +82,5 @@
     "semantic-release": "25.0.9",
     "typescript": "6.0.3"
   },
-  "keywords": [
-    "openmessage",
-    "backend",
-    "fastify",
-    "typescript"
-  ]
+  "keywords": ["openmessage", "backend", "fastify", "typescript"]
 }

@@ -19,6 +19,7 @@ test('reads canonical messages and ordered interaction directories without write
   const interactionId = randomUUID();
   const firstMessageId = randomUUID();
   const secondMessageId = randomUUID();
+  const thirdMessageId = randomUUID();
   const createdAt = new Date('2026-09-15T02:03:04.000Z');
 
   try {
@@ -27,13 +28,15 @@ test('reads canonical messages and ordered interaction directories without write
       INSERT INTO messages (id, origin, destination, content, created_at)
       VALUES
         (${firstMessageId}, 'endpoint-a', 'endpoint-b', 'first', ${createdAt}),
-        (${secondMessageId}, 'endpoint-b', 'endpoint-a', 'second', ${createdAt})
+        (${secondMessageId}, 'endpoint-b', 'endpoint-a', 'second', ${createdAt}),
+        (${thirdMessageId}, 'endpoint-a', 'endpoint-b', 'third', ${createdAt})
     `;
     await db`
       INSERT INTO interaction_messages (interaction_id, message_id, position)
       VALUES
-        (${interactionId}, ${firstMessageId}, 0),
-        (${interactionId}, ${secondMessageId}, 1)
+        (${interactionId}, ${firstMessageId}, 10),
+        (${interactionId}, ${secondMessageId}, 2),
+        (${interactionId}, ${thirdMessageId}, 9007199254740993)
     `;
 
     assert.deepEqual(await getMessage.execute(firstMessageId), {
@@ -47,8 +50,9 @@ test('reads canonical messages and ordered interaction directories without write
     assert.deepEqual(await getInteraction.execute(interactionId), {
       id: interactionId,
       messages: [
-        { messageId: firstMessageId, position: 0 },
-        { messageId: secondMessageId, position: 1 },
+        { messageId: secondMessageId, position: '2' },
+        { messageId: firstMessageId, position: '10' },
+        { messageId: thirdMessageId, position: '9007199254740993' },
       ],
     });
 

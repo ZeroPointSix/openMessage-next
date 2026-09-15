@@ -17,7 +17,7 @@ interface MessageRow {
 
 interface InteractionMessageRow {
   message_id: string;
-  position: string | number | bigint;
+  position: string;
 }
 
 export class PostgresMessageReadStore implements MessageReadStore {
@@ -58,17 +58,17 @@ export class PostgresMessageReadStore implements MessageReadStore {
     }
 
     const rows = await this.#db<InteractionMessageRow[]>`
-      SELECT message_id, position
+      SELECT message_id, position::text AS position
       FROM interaction_messages
       WHERE interaction_id = ${interactionId}
-      ORDER BY position ASC
+      ORDER BY interaction_messages.position ASC
     `;
 
     return {
       id: interactionId,
       messages: rows.map((row) => ({
         messageId: row.message_id,
-        position: toPosition(row.position),
+        position: row.position,
       })),
     };
   }
@@ -79,14 +79,4 @@ function toDate(value: Date | string): Date {
     return value;
   }
   return new Date(value);
-}
-
-function toPosition(value: string | number | bigint): number {
-  if (typeof value === 'number') {
-    return value;
-  }
-  if (typeof value === 'bigint') {
-    return Number(value);
-  }
-  return Number(value);
 }
