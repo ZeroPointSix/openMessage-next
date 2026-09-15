@@ -42,7 +42,7 @@ export class PostgresSubmitMessageStore implements SubmitMessageStore {
       if (!currentPosition) {
         throw new Error('Failed to allocate interaction message position');
       }
-      const nextPosition = BigInt(currentPosition.position) + 1n;
+      const nextPosition = (BigInt(currentPosition.position) + 1n).toString();
 
       await tx`
         INSERT INTO messages (id, origin, destination, content, created_at)
