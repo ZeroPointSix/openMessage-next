@@ -23,7 +23,7 @@ export default async function createServer(fastify: FastifyInstance) {
   await fastify.register(AutoLoad, {
     dir: interfacesDir,
     dirNameRoutePrefix: false,
-    matchFilter: (routePath) => /endpoints\.route\.ts$/.test(routePath),
+    matchFilter: (routePath) => /(endpoints|messages)\.route\.ts$/.test(routePath),
   });
 
   await fastify.register(AutoLoad, {
@@ -33,7 +33,7 @@ export default async function createServer(fastify: FastifyInstance) {
       prefix: '/api',
     },
     matchFilter: (routePath) =>
-      /\.route\.ts$/.test(routePath) && !/endpoints\.route\.ts$/.test(routePath),
+      /\.route\.ts$/.test(routePath) && !/(endpoints|messages)\.route\.ts$/.test(routePath),
   });
 
   await fastify.register(UnderPressure, {

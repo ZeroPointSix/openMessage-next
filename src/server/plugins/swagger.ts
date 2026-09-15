@@ -21,6 +21,12 @@ async function swaggerGeneratorPlugin(fastify: FastifyInstance) {
             bearerFormat: 'API key',
             description: 'Management token for runtime endpoint configuration.',
           },
+          messageBearer: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'API key',
+            description: 'API key for Message and Interaction operations.',
+          },
         },
       },
     },
