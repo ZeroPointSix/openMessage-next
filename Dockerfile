@@ -42,6 +42,9 @@ COPY package.json ./
 # Copy application source
 COPY src ./src
 
+# Source checkouts may use a restrictive umask; keep the runtime readable by the non-root user.
+RUN chmod -R a+rX /app
+
 USER fastify
 
 EXPOSE 3000
