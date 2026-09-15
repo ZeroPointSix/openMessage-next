@@ -10,7 +10,7 @@ export interface InteractionReadModel {
   id: string;
   messages: Array<{
     messageId: string;
-    position: number;
+    position: string;
   }>;
 }
 
@@ -26,7 +26,7 @@ export interface InteractionDirectory {
   id: string;
   messages: Array<{
     messageId: string;
-    position: number;
+    position: string;
   }>;
 }
 
