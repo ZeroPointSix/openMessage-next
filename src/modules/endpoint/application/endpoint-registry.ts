@@ -28,8 +28,7 @@ export interface EndpointStore {
 export type EndpointRegistryErrorCode =
   | 'INVALID_REQUEST'
   | 'ENDPOINT_ALREADY_EXISTS'
-  | 'ENDPOINT_NOT_FOUND'
-  | 'ENDPOINT_DISABLED';
+  | 'ENDPOINT_NOT_FOUND';
 
 export class EndpointRegistryError extends Error {
   readonly code: EndpointRegistryErrorCode;
@@ -101,28 +100,6 @@ export class UpdateEndpointService {
 
     if (!endpoint) {
       throw endpointNotFound(command.endpointId);
-    }
-
-    return endpoint;
-  }
-}
-
-export class ResolveEndpointService {
-  readonly #store: EndpointStore;
-
-  constructor({ store }: EndpointRegistryDependencies) {
-    this.#store = store;
-  }
-
-  async execute(endpointId: string): Promise<EndpointRoute> {
-    assertNonBlank(endpointId, 'endpointId');
-    const endpoint = await this.#store.findById(endpointId);
-
-    if (!endpoint) {
-      throw endpointNotFound(endpointId);
-    }
-    if (!endpoint.enabled) {
-      throw new EndpointRegistryError('ENDPOINT_DISABLED', `Endpoint ${endpointId} is disabled`);
     }
 
     return endpoint;

@@ -6,7 +6,6 @@ import {
   type EndpointRoute,
   type EndpointStore,
   GetEndpointService,
-  ResolveEndpointService,
   type UpdateEndpointCommand,
   UpdateEndpointService,
 } from '../index.ts';
@@ -76,7 +75,7 @@ test('updates the route and resolves the new address immediately', async () => {
   const store = new MemoryEndpointStore();
   const createEndpoint = new CreateEndpointService({ store });
   const updateEndpoint = new UpdateEndpointService({ store });
-  const resolveEndpoint = new ResolveEndpointService({ store });
+  const getEndpoint = new GetEndpointService({ store });
   await createEndpoint.execute(endpoint);
 
   const updated = await updateEndpoint.execute({
@@ -85,22 +84,8 @@ test('updates the route and resolves the new address immediately', async () => {
   });
 
   assert.deepEqual(updated, { ...endpoint, address: 'https://new.example.test/messages' });
-  assert.deepEqual(await resolveEndpoint.execute(endpoint.endpointId), updated);
+  assert.deepEqual(await getEndpoint.execute(endpoint.endpointId), updated);
   assert.deepEqual(store.findCalls, [endpoint.endpointId]);
-});
-
-test('distinguishes missing endpoints from disabled endpoints', async () => {
-  const store = new MemoryEndpointStore();
-  const createEndpoint = new CreateEndpointService({ store });
-  const resolveEndpoint = new ResolveEndpointService({ store });
-  await createEndpoint.execute({ ...endpoint, enabled: false });
-
-  await assert.rejects(resolveEndpoint.execute('missing'), (error: unknown) => {
-    return error instanceof EndpointRegistryError && error.code === 'ENDPOINT_NOT_FOUND';
-  });
-  await assert.rejects(resolveEndpoint.execute(endpoint.endpointId), (error: unknown) => {
-    return error instanceof EndpointRegistryError && error.code === 'ENDPOINT_DISABLED';
-  });
 });
 
 test('returns not found when getting or updating a missing endpoint', async () => {
@@ -118,7 +103,7 @@ test('returns not found when getting or updating a missing endpoint', async () =
 test('validates commands before accessing the store', async () => {
   const store = new MemoryEndpointStore();
   const createEndpoint = new CreateEndpointService({ store });
-  const resolveEndpoint = new ResolveEndpointService({ store });
+  const getEndpoint = new GetEndpointService({ store });
 
   await assert.rejects(
     createEndpoint.execute({ ...endpoint, address: '   ' }),
@@ -128,7 +113,7 @@ test('validates commands before accessing the store', async () => {
     createEndpoint.execute({ ...endpoint, address: 'https://' }),
     hasCode('INVALID_REQUEST'),
   );
-  await assert.rejects(resolveEndpoint.execute(''), hasCode('INVALID_REQUEST'));
+  await assert.rejects(getEndpoint.execute(''), hasCode('INVALID_REQUEST'));
   assert.equal(store.endpoints.size, 0);
   assert.equal(store.findCalls.length, 0);
 });

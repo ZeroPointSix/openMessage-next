@@ -4,9 +4,7 @@ import test from 'node:test';
 import postgres from 'postgres';
 import {
   CreateEndpointService,
-  EndpointRegistryError,
   GetEndpointService,
-  ResolveEndpointService,
   UpdateEndpointService,
 } from '#src/modules/endpoint/index.ts';
 import { PostgresEndpointStore } from './postgres-endpoint-store.ts';
@@ -22,7 +20,6 @@ test('persists endpoint config and resolves updates without restarting', {
   const createEndpoint = new CreateEndpointService({ store });
   const getEndpoint = new GetEndpointService({ store });
   const updateEndpoint = new UpdateEndpointService({ store });
-  const resolveEndpoint = new ResolveEndpointService({ store });
   const endpointId = randomUUID();
   const missingEndpointId = randomUUID();
   const initial = {
@@ -40,19 +37,14 @@ test('persists endpoint config and resolves updates without restarting', {
       endpointId,
       address: 'https://new.example.test/messages',
     });
-    assert.deepEqual(await resolveEndpoint.execute(endpointId), afterAddressUpdate);
+    assert.deepEqual(await store.findById(endpointId), afterAddressUpdate);
 
     await updateEndpoint.execute({ endpointId, enabled: false });
     assert.deepEqual(await getEndpoint.execute(endpointId), {
       ...afterAddressUpdate,
       enabled: false,
     });
-    await assert.rejects(resolveEndpoint.execute(endpointId), (error: unknown) => {
-      return error instanceof EndpointRegistryError && error.code === 'ENDPOINT_DISABLED';
-    });
-    await assert.rejects(resolveEndpoint.execute(missingEndpointId), (error: unknown) => {
-      return error instanceof EndpointRegistryError && error.code === 'ENDPOINT_NOT_FOUND';
-    });
+    assert.equal(await store.findById(missingEndpointId), undefined);
   } finally {
     await db`DELETE FROM endpoints WHERE id IN (${endpointId}, ${missingEndpointId})`;
     await db.end();
