@@ -26,7 +26,6 @@ export class BestEffortDispatcher implements MessageDispatcher {
 
   dispatch(envelope: EgressEnvelope): void {
     let adapterName = 'unresolved';
-
     void this.#deliver(envelope, (name) => {
       adapterName = name;
     }).catch((error: unknown) => {
@@ -36,8 +35,6 @@ export class BestEffortDispatcher implements MessageDispatcher {
           interactionId: envelope.interactionId,
           destination: envelope.message.destination,
           adapter: adapterName,
-          // Plain object so Fastify/pino JSON keeps the failure details. The
-          // default serializer only expands the `err` key; Linear requires `error`.
           error: toLoggableError(error),
         },
         'Best-effort egress delivery failed',
@@ -47,20 +44,17 @@ export class BestEffortDispatcher implements MessageDispatcher {
 
   async #deliver(envelope: EgressEnvelope, onResolved: (adapter: string) => void): Promise<void> {
     const route = await this.#endpointResolver.resolveEndpoint(envelope.message.destination);
-    if (!route) {
-      throw new Error('Destination endpoint no longer exists');
-    }
-    if (!route.enabled) {
-      throw new Error('Destination endpoint is disabled');
-    }
-
+    if (!route) throw new Error('Destination endpoint no longer exists');
+    if (!route.enabled) throw new Error('Destination endpoint is disabled');
     onResolved(route.egressAdapter);
     const adapter = this.#adapters.get(route.egressAdapter);
-    if (!adapter) {
-      throw new Error(`Unsupported egress adapter: ${route.egressAdapter}`);
-    }
-
-    await adapter.deliver(route.address, envelope);
+    if (!adapter) throw new Error(`Unsupported egress adapter: ${route.egressAdapter}`);
+    const headers = (
+      route as typeof route & {
+        headers?: Readonly<Record<string, string>>;
+      }
+    ).headers;
+    await adapter.deliver(route.address, envelope, headers);
   }
 }
 
@@ -72,9 +66,5 @@ function toLoggableError(error: unknown): EgressFailureError {
       ...(error.stack === undefined ? {} : { stack: error.stack }),
     };
   }
-
-  return {
-    name: 'Error',
-    message: String(error),
-  };
+  return { name: 'Error', message: String(error) };
 }

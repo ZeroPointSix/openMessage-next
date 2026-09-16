@@ -21,12 +21,20 @@ export interface GestureAction {
 
 export type GestureConfig = Record<GestureSlot, GestureAction>;
 
+export interface ReplyDelivery {
+  destination: string;
+  content: string;
+  preparedAt: string;
+  replyMessageId?: string;
+}
+
 export interface DeckItem {
   messageId: string;
   interactionId: string;
   status: DeckStatus;
   attention: AttentionState;
   receivedAt: string;
+  replyDelivery?: ReplyDelivery;
 }
 
 export interface CanonicalMessage {

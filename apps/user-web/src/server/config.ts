@@ -11,7 +11,8 @@ export interface UserWebConfig {
   coreUrl: string;
   messageApiToken: string;
   endpointConfigToken: string;
-  inboundToken?: string;
+  inboundToken: string;
+  humanApiToken: string;
 }
 
 const readBoolean = (value: string | undefined, fallback: boolean): boolean => {
@@ -60,6 +61,7 @@ export const loadConfig = (environment = process.env): UserWebConfig => {
       'OPENMESSAGE_ENDPOINT_CONFIG_TOKEN',
       environment.OPENMESSAGE_ENDPOINT_CONFIG_TOKEN,
     ),
-    inboundToken: environment.USER_WEB_INBOUND_TOKEN?.trim() || undefined,
+    inboundToken: requireValue('USER_WEB_INBOUND_TOKEN', environment.USER_WEB_INBOUND_TOKEN),
+    humanApiToken: requireValue('USER_WEB_HUMAN_API_TOKEN', environment.USER_WEB_HUMAN_API_TOKEN),
   };
 };

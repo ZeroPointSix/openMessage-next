@@ -26,15 +26,33 @@ test('posts the exact message envelope as JSON', async () => {
       return new Response(null, { status: 204 });
     },
   });
-
   await adapter.deliver('https://example.test/messages', envelope);
-
   assert.equal(receivedAddress, 'https://example.test/messages');
   assert.equal(receivedInit?.method, 'POST');
   assert.equal(receivedInit?.redirect, 'manual');
   assert.deepEqual(receivedInit?.headers, { 'content-type': 'application/json' });
   assert.equal(receivedInit?.body, JSON.stringify(envelope));
   assert.ok(receivedInit?.signal instanceof AbortSignal);
+});
+
+test('sends endpoint-configured headers while retaining the JSON content type', async () => {
+  let receivedHeaders: HeadersInit | undefined;
+  const adapter = new HttpEgressAdapter({
+    timeoutMs: 1000,
+    fetch: async (_address, init) => {
+      receivedHeaders = init?.headers;
+      return new Response(null, { status: 204 });
+    },
+  });
+  await adapter.deliver('https://example.test/messages', envelope, {
+    'x-openmessage-token': 'inbound-secret',
+    'x-client': 'user-web',
+  });
+  assert.deepEqual(receivedHeaders, {
+    'x-openmessage-token': 'inbound-secret',
+    'x-client': 'user-web',
+    'content-type': 'application/json',
+  });
 });
 
 async function listen(server: Server): Promise<string> {
@@ -51,9 +69,9 @@ async function listen(server: Server): Promise<string> {
 }
 
 async function close(server: Server): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    server.close((error) => (error ? reject(error) : resolve()));
-  });
+  await new Promise<void>((resolve, reject) =>
+    server.close((error) => (error ? reject(error) : resolve())),
+  );
 }
 
 test('does not follow redirect responses', async () => {
@@ -70,15 +88,12 @@ test('does not follow redirect responses', async () => {
       response.writeHead(status, { location: `${redirectTargetAddress}/redirected` }).end();
     });
     const configuredEndpointAddress = await listen(configuredEndpoint);
-
     try {
       const adapter = new HttpEgressAdapter({ timeoutMs: 5000 });
-
       await assert.rejects(
         adapter.deliver(`${configuredEndpointAddress}/messages`, envelope),
         new RegExp(`HTTP egress returned status ${status}`),
       );
-
       assert.equal(configuredEndpointRequests, 1);
       assert.equal(redirectTargetRequests, 0);
     } finally {
@@ -92,7 +107,6 @@ test('rejects a non-success HTTP response without reading its body', async () =>
     timeoutMs: 1000,
     fetch: async () => new Response('sensitive remote response', { status: 503 }),
   });
-
   await assert.rejects(
     adapter.deliver('https://example.test/messages', envelope),
     /HTTP egress returned status 503/,
@@ -107,7 +121,6 @@ test('aborts a stalled request when the configured timeout expires', async () =>
         init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
       }),
   });
-
   await assert.rejects(adapter.deliver('https://example.test/messages', envelope), {
     name: 'TimeoutError',
   });

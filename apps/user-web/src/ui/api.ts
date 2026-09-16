@@ -17,15 +17,34 @@ interface ConfigResponse {
   enabled: boolean;
 }
 
+const sessionKey = 'openmessage-human-token';
+
+const getHumanToken = (): string => {
+  const current = sessionStorage.getItem(sessionKey);
+  if (current) {
+    return current;
+  }
+  const entered = window.prompt('Human access token')?.trim();
+  if (!entered) {
+    throw new Error('Human authentication is required');
+  }
+  sessionStorage.setItem(sessionKey, entered);
+  return entered;
+};
+
 const request = async <Response>(path: string, init?: RequestInit): Promise<Response> => {
   const response = await fetch(path, {
     ...init,
     headers: {
+      authorization: `Bearer ${getHumanToken()}`,
       'content-type': 'application/json',
       ...init?.headers,
     },
   });
   if (!response.ok) {
+    if (response.status === 401) {
+      sessionStorage.removeItem(sessionKey);
+    }
     const detail = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
     throw new Error(detail?.error ?? `Request failed (${response.status})`);
   }

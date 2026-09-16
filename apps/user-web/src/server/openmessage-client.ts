@@ -6,6 +6,11 @@ interface SubmitMessageResponse {
   interactionId: string;
 }
 
+interface InteractionDirectory {
+  id: string;
+  messages: Array<{ messageId: string; position: string }>;
+}
+
 const requestJson = async <Response>(
   url: string,
   token: string,
@@ -43,10 +48,29 @@ export class OpenMessageClient {
     );
   }
 
-  async getInteraction(interactionId: string): Promise<unknown> {
-    return requestJson(
+  async getInteraction(interactionId: string): Promise<InteractionDirectory> {
+    return requestJson<InteractionDirectory>(
       `${this.config.coreUrl}/v1/interactions/${encodeURIComponent(interactionId)}`,
       this.config.messageApiToken,
+    );
+  }
+
+  async findReply(input: {
+    interactionId: string;
+    destination: string;
+    content: string;
+    preparedAt: string;
+  }): Promise<CanonicalMessage | undefined> {
+    const interaction = await this.getInteraction(input.interactionId);
+    const messages = await Promise.all(
+      interaction.messages.toReversed().map(({ messageId }) => this.getMessage(messageId)),
+    );
+    return messages.find(
+      (message) =>
+        message.origin === this.config.clientId &&
+        message.destination === input.destination &&
+        message.content === input.content &&
+        message.createdAt >= input.preparedAt,
     );
   }
 
@@ -78,6 +102,7 @@ export class OpenMessageClient {
       headers: { authorization: `Bearer ${this.config.endpointConfigToken}` },
       signal: AbortSignal.timeout(8000),
     });
+    const endpointHeaders = { 'x-openmessage-token': this.config.inboundToken };
 
     if (current.status === 404) {
       await requestJson(`${this.config.coreUrl}/v1/endpoints`, this.config.endpointConfigToken, {
@@ -86,6 +111,7 @@ export class OpenMessageClient {
           id: this.config.clientId,
           egressAdapter: 'http',
           address: this.config.publicUrl,
+          headers: endpointHeaders,
           enabled: this.config.enabled,
         }),
       });
@@ -100,6 +126,7 @@ export class OpenMessageClient {
       method: 'PATCH',
       body: JSON.stringify({
         address: this.config.publicUrl,
+        headers: endpointHeaders,
         enabled: this.config.enabled,
       }),
     });

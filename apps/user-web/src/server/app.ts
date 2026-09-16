@@ -1,7 +1,8 @@
+import { timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import fastifyStatic from '@fastify/static';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import {
   type ActionInvocation,
   actionTypes,
@@ -20,26 +21,29 @@ const gestureSlots: GestureSlot[] = ['left', 'right', 'up', 'down', 'custom-inpu
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+const readHeader = (value: string | string[] | undefined): string | undefined =>
+  Array.isArray(value) ? value[0] : value;
+
+const matchesSecret = (expected: string, actual: string | undefined): boolean => {
+  if (!actual) return false;
+  const expectedBytes = Buffer.from(expected);
+  const actualBytes = Buffer.from(actual);
+  return expectedBytes.length === actualBytes.length && timingSafeEqual(expectedBytes, actualBytes);
+};
+
 const isAction = (value: unknown): value is ActionInvocation => {
-  if (!isRecord(value) || !actionTypes.includes(value.type as ActionInvocation['type'])) {
+  if (!isRecord(value) || !actionTypes.includes(value.type as ActionInvocation['type']))
     return false;
-  }
-  if (value.value !== undefined && typeof value.value !== 'string') {
-    return false;
-  }
+  if (value.value !== undefined && typeof value.value !== 'string') return false;
   return value.type !== 'send-fixed-message' || Boolean(value.value?.trim());
 };
 
 const parseGestures = (value: unknown): GestureConfig | undefined => {
-  if (!isRecord(value)) {
-    return undefined;
-  }
+  if (!isRecord(value)) return undefined;
   const entries: Partial<Record<GestureSlot, GestureAction>> = {};
   for (const slot of gestureSlots) {
     const action = value[slot];
-    if (!isAction(action)) {
-      return undefined;
-    }
+    if (!isAction(action)) return undefined;
     entries[slot] = action;
   }
   return entries as GestureConfig;
@@ -56,9 +60,8 @@ const parseEnvelope = (value: unknown): InboundEnvelope | undefined => {
     typeof message.destination !== 'string' ||
     typeof message.content !== 'string' ||
     typeof message.createdAt !== 'string'
-  ) {
+  )
     return undefined;
-  }
   return {
     interactionId: value.interactionId,
     message: {
@@ -78,16 +81,23 @@ export const buildApp = async (config: UserWebConfig): Promise<FastifyInstance> 
   const core = new OpenMessageClient(config);
   const actions = new ActionService(store, core);
 
+  const authenticateHuman = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    const authorization = readHeader(request.headers.authorization);
+    const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
+    if (!matchesSecret(config.humanApiToken, token)) {
+      await reply.header('www-authenticate', 'Bearer').code(401).send({ error: 'Unauthorized' });
+    }
+  };
+  const humanOnly = { preHandler: authenticateHuman };
+
   app.get('/health', async () => ({ status: 'ok', clientId: config.clientId }));
 
   app.post('/api/inbound', async (request, reply) => {
-    if (config.inboundToken && request.headers['x-openmessage-token'] !== config.inboundToken) {
+    if (!matchesSecret(config.inboundToken, readHeader(request.headers['x-openmessage-token']))) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
     const envelope = parseEnvelope(request.body);
-    if (!envelope) {
-      return reply.code(400).send({ error: 'Invalid openMessage envelope' });
-    }
+    if (!envelope) return reply.code(400).send({ error: 'Invalid openMessage envelope' });
     if (envelope.message.destination !== config.clientId) {
       return reply.code(409).send({ error: 'Message destination does not match this client' });
     }
@@ -95,13 +105,12 @@ export const buildApp = async (config: UserWebConfig): Promise<FastifyInstance> 
     return reply.code(result.created ? 201 : 200).send(result);
   });
 
-  app.get('/api/deck', async (_request, reply) => {
+  app.get('/api/deck', humanOnly, async (_request, reply) => {
     try {
       const items = await Promise.all(
-        store.listActive().map(async (item) => ({
-          ...item,
-          message: await core.getMessage(item.messageId),
-        })),
+        store
+          .listActive()
+          .map(async (item) => ({ ...item, message: await core.getMessage(item.messageId) })),
       );
       return { items };
     } catch (error) {
@@ -111,11 +120,10 @@ export const buildApp = async (config: UserWebConfig): Promise<FastifyInstance> 
 
   app.get<{ Params: { messageId: string } }>(
     '/api/items/:messageId/context',
+    humanOnly,
     async (request, reply) => {
       const item = store.get(request.params.messageId);
-      if (!item) {
-        return reply.code(404).send({ error: 'Deck item not found' });
-      }
+      if (!item) return reply.code(404).send({ error: 'Deck item not found' });
       try {
         return { interaction: await core.getInteraction(item.interactionId) };
       } catch (error) {
@@ -126,31 +134,26 @@ export const buildApp = async (config: UserWebConfig): Promise<FastifyInstance> 
 
   app.post<{ Params: { messageId: string } }>(
     '/api/items/:messageId/actions',
+    humanOnly,
     async (request, reply) => {
-      if (!isAction(request.body)) {
-        return reply.code(400).send({ error: 'Invalid action' });
-      }
+      if (!isAction(request.body)) return reply.code(400).send({ error: 'Invalid action' });
       try {
         return await actions.execute(request.params.messageId, request.body);
       } catch (error) {
         const message = (error as Error).message;
-        const status = message === 'Deck item not found' ? 404 : 409;
-        return reply.code(status).send({ error: message });
+        return reply.code(message === 'Deck item not found' ? 404 : 409).send({ error: message });
       }
     },
   );
 
-  app.get('/api/gestures', async () => ({ gestures: store.getGestures() }));
-
-  app.put('/api/gestures', async (request, reply) => {
+  app.get('/api/gestures', humanOnly, async () => ({ gestures: store.getGestures() }));
+  app.put('/api/gestures', humanOnly, async (request, reply) => {
     const gestures = parseGestures(request.body);
-    if (!gestures) {
-      return reply.code(400).send({ error: 'Invalid gesture configuration' });
-    }
+    if (!gestures) return reply.code(400).send({ error: 'Invalid gesture configuration' });
     return { gestures: await store.setGestures(gestures) };
   });
 
-  app.get('/api/config', async () => ({
+  app.get('/api/config', humanOnly, async () => ({
     clientId: config.clientId,
     coreUrl: config.coreUrl,
     enabled: config.enabled,
@@ -161,6 +164,5 @@ export const buildApp = async (config: UserWebConfig): Promise<FastifyInstance> 
     await app.register(fastifyStatic, { root: staticRoot, wildcard: false });
     app.setNotFoundHandler((_request, reply) => reply.sendFile('index.html'));
   }
-
   return app;
 };

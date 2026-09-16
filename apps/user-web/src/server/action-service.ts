@@ -1,8 +1,20 @@
-import type { ActionInvocation, ActionResult, CanonicalMessage } from '../shared/contracts.ts';
+import type {
+  ActionInvocation,
+  ActionResult,
+  CanonicalMessage,
+  DeckItem,
+  ReplyDelivery,
+} from '../shared/contracts.ts';
 import type { DeckStore } from './deck-store.ts';
 
 export interface CoreActionPort {
   getMessage(messageId: string): Promise<CanonicalMessage>;
+  findReply(input: {
+    interactionId: string;
+    destination: string;
+    content: string;
+    preparedAt: string;
+  }): Promise<CanonicalMessage | undefined>;
   submitReply(input: {
     interactionId: string;
     destination: string;
@@ -31,24 +43,15 @@ export class ActionService {
       if (!item) {
         throw new Error('Deck item not found');
       }
+      if (item.status === 'handled') {
+        throw new Error('Deck item is already handled');
+      }
 
       if (action.type === 'send-fixed-message' || action.type === 'send-custom-message') {
-        const content = action.value?.trim();
-        if (!content) {
-          throw new Error(
-            action.type === 'send-fixed-message'
-              ? 'Fixed message must not be empty'
-              : 'Custom message must not be empty',
-          );
-        }
-        const source = await this.core.getMessage(messageId);
-        const reply = await this.core.submitReply({
-          interactionId: item.interactionId,
-          destination: source.origin,
-          content,
-        });
-        const updated = await this.store.update(messageId, { status: 'handled' });
-        return { item: updated, advance: true, replyMessageId: reply.messageId };
+        return await this.submitReply(item, action);
+      }
+      if (item.replyDelivery) {
+        throw new Error('A reply is awaiting recovery for this card');
       }
 
       if (action.type === 'handled') {
@@ -87,5 +90,58 @@ export class ActionService {
     } finally {
       this.inFlight.delete(messageId);
     }
+  }
+
+  private async submitReply(item: DeckItem, action: ActionInvocation): Promise<ActionResult> {
+    let delivery = item.replyDelivery;
+    if (!delivery) {
+      const content = action.value?.trim();
+      if (!content) {
+        throw new Error(
+          action.type === 'send-fixed-message'
+            ? 'Fixed message must not be empty'
+            : 'Custom message must not be empty',
+        );
+      }
+      const source = await this.core.getMessage(item.messageId);
+      delivery = {
+        destination: source.origin,
+        content,
+        preparedAt: new Date().toISOString(),
+      };
+      await this.store.update(item.messageId, { replyDelivery: delivery });
+    }
+
+    const existing = await this.core.findReply({
+      interactionId: item.interactionId,
+      destination: delivery.destination,
+      content: delivery.content,
+      preparedAt: delivery.preparedAt,
+    });
+    const reply =
+      existing ??
+      (await this.core.submitReply({
+        interactionId: item.interactionId,
+        destination: delivery.destination,
+        content: delivery.content,
+      }));
+    const replyMessageId = 'id' in reply ? reply.id : reply.messageId;
+    const completed: ReplyDelivery = { ...delivery, replyMessageId };
+
+    let updated: DeckItem;
+    try {
+      updated = await this.store.update(item.messageId, {
+        status: 'handled',
+        replyDelivery: completed,
+      });
+    } catch (error) {
+      const inMemory = this.store.get(item.messageId);
+      if (inMemory?.status !== 'handled') {
+        throw error;
+      }
+      updated = inMemory;
+    }
+
+    return { item: updated, advance: true, replyMessageId };
   }
 }

@@ -7,6 +7,7 @@ import {
   defaultGestures,
   type GestureConfig,
   type InboundEnvelope,
+  type ReplyDelivery,
 } from '../shared/contracts.ts';
 
 interface PersistedState {
@@ -15,11 +16,33 @@ interface PersistedState {
   gestures: GestureConfig;
 }
 
+export type StateWriter = (filePath: string, snapshot: string) => Promise<void>;
+
+const writeState: StateWriter = async (filePath, snapshot) => {
+  await mkdir(dirname(filePath), { recursive: true });
+  const temporary = `${filePath}.tmp`;
+  await writeFile(temporary, snapshot, 'utf8');
+  await rename(temporary, filePath);
+};
+
 const initialState = (): PersistedState => ({
   version: 1,
   items: [],
   gestures: structuredClone(defaultGestures),
 });
+
+const isReplyDelivery = (value: unknown): value is ReplyDelivery => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const delivery = value as Partial<ReplyDelivery>;
+  return (
+    typeof delivery.destination === 'string' &&
+    typeof delivery.content === 'string' &&
+    typeof delivery.preparedAt === 'string' &&
+    (delivery.replyMessageId === undefined || typeof delivery.replyMessageId === 'string')
+  );
+};
 
 const isDeckItem = (value: unknown): value is DeckItem => {
   if (typeof value !== 'object' || value === null) {
@@ -31,7 +54,8 @@ const isDeckItem = (value: unknown): value is DeckItem => {
     typeof item.interactionId === 'string' &&
     typeof item.receivedAt === 'string' &&
     (item.status === 'pending' || item.status === 'later' || item.status === 'handled') &&
-    (item.attention === 'unread' || item.attention === 'read')
+    (item.attention === 'unread' || item.attention === 'read') &&
+    (item.replyDelivery === undefined || isReplyDelivery(item.replyDelivery))
   );
 };
 
@@ -50,11 +74,13 @@ const parseState = (source: string): PersistedState => {
 
 export class DeckStore {
   private readonly filePath: string;
+  private readonly writer: StateWriter;
   private state: PersistedState = initialState();
   private writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(filePath: string) {
+  constructor(filePath: string, writer: StateWriter = writeState) {
     this.filePath = filePath;
+    this.writer = writer;
   }
 
   async load(): Promise<void> {
@@ -77,12 +103,12 @@ export class DeckStore {
         }
         return left.receivedAt.localeCompare(right.receivedAt);
       })
-      .map((item) => ({ ...item }));
+      .map((item) => structuredClone(item));
   }
 
   get(messageId: string): DeckItem | undefined {
     const item = this.state.items.find((candidate) => candidate.messageId === messageId);
-    return item ? { ...item } : undefined;
+    return item ? structuredClone(item) : undefined;
   }
 
   getGestures(): GestureConfig {
@@ -92,7 +118,7 @@ export class DeckStore {
   async add(envelope: InboundEnvelope): Promise<{ item: DeckItem; created: boolean }> {
     const existing = this.state.items.find((item) => item.messageId === envelope.message.id);
     if (existing) {
-      return { item: { ...existing }, created: false };
+      return { item: structuredClone(existing), created: false };
     }
 
     const item: DeckItem = {
@@ -104,12 +130,16 @@ export class DeckStore {
     };
     this.state.items.push(item);
     await this.persist();
-    return { item: { ...item }, created: true };
+    return { item: structuredClone(item), created: true };
   }
 
   async update(
     messageId: string,
-    update: { status?: DeckStatus; attention?: AttentionState },
+    update: {
+      status?: DeckStatus;
+      attention?: AttentionState;
+      replyDelivery?: ReplyDelivery;
+    },
   ): Promise<DeckItem> {
     const index = this.state.items.findIndex((item) => item.messageId === messageId);
     if (index < 0) {
@@ -120,10 +150,10 @@ export class DeckStore {
     if (!current) {
       throw new Error('Deck item not found');
     }
-    const next = { ...current, ...update };
+    const next = { ...current, ...structuredClone(update) };
     this.state.items[index] = next;
     await this.persist();
-    return { ...next };
+    return structuredClone(next);
   }
 
   async setGestures(gestures: GestureConfig): Promise<GestureConfig> {
@@ -134,12 +164,10 @@ export class DeckStore {
 
   private async persist(): Promise<void> {
     const snapshot = JSON.stringify(this.state, null, 2);
-    this.writeQueue = this.writeQueue.then(async () => {
-      await mkdir(dirname(this.filePath), { recursive: true });
-      const temporary = `${this.filePath}.tmp`;
-      await writeFile(temporary, snapshot, 'utf8');
-      await rename(temporary, this.filePath);
-    });
-    await this.writeQueue;
+    const write = this.writeQueue
+      .catch(() => undefined)
+      .then(() => this.writer(this.filePath, snapshot));
+    this.writeQueue = write.catch(() => undefined);
+    await write;
   }
 }

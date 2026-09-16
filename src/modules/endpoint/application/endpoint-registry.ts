@@ -3,6 +3,7 @@ export interface EndpointRoute {
   egressAdapter: string;
   address: string;
   enabled: boolean;
+  headers?: Readonly<Record<string, string>>;
 }
 
 export interface CreateEndpointCommand {
@@ -10,6 +11,7 @@ export interface CreateEndpointCommand {
   egressAdapter: string;
   address: string;
   enabled: boolean;
+  headers?: Readonly<Record<string, string>>;
 }
 
 export interface UpdateEndpointCommand {
@@ -17,6 +19,7 @@ export interface UpdateEndpointCommand {
   egressAdapter?: string;
   address?: string;
   enabled?: boolean;
+  headers?: Readonly<Record<string, string>>;
 }
 
 export interface EndpointStore {
@@ -32,7 +35,6 @@ export type EndpointRegistryErrorCode =
 
 export class EndpointRegistryError extends Error {
   readonly code: EndpointRegistryErrorCode;
-
   constructor(code: EndpointRegistryErrorCode, message: string) {
     super(message);
     this.name = 'EndpointRegistryError';
@@ -46,62 +48,44 @@ interface EndpointRegistryDependencies {
 
 export class CreateEndpointService {
   readonly #store: EndpointStore;
-
   constructor({ store }: EndpointRegistryDependencies) {
     this.#store = store;
   }
-
   async execute(command: CreateEndpointCommand): Promise<EndpointRoute> {
     validateCreateEndpoint(command);
     const endpoint = toRoute(command);
-
     if (!(await this.#store.create(endpoint))) {
       throw new EndpointRegistryError(
         'ENDPOINT_ALREADY_EXISTS',
         `Endpoint ${command.endpointId} already exists`,
       );
     }
-
     return endpoint;
   }
 }
 
 export class GetEndpointService {
   readonly #store: EndpointStore;
-
   constructor({ store }: EndpointRegistryDependencies) {
     this.#store = store;
   }
-
   async execute(endpointId: string): Promise<EndpointRoute> {
     assertNonBlank(endpointId, 'endpointId');
-    return this.#findRequired(endpointId);
-  }
-
-  async #findRequired(endpointId: string): Promise<EndpointRoute> {
     const endpoint = await this.#store.findById(endpointId);
-    if (!endpoint) {
-      throw endpointNotFound(endpointId);
-    }
+    if (!endpoint) throw endpointNotFound(endpointId);
     return endpoint;
   }
 }
 
 export class UpdateEndpointService {
   readonly #store: EndpointStore;
-
   constructor({ store }: EndpointRegistryDependencies) {
     this.#store = store;
   }
-
   async execute(command: UpdateEndpointCommand): Promise<EndpointRoute> {
     validateUpdateEndpoint(command);
     const endpoint = await this.#store.update(command);
-
-    if (!endpoint) {
-      throw endpointNotFound(command.endpointId);
-    }
-
+    if (!endpoint) throw endpointNotFound(command.endpointId);
     return endpoint;
   }
 }
@@ -113,6 +97,7 @@ function validateCreateEndpoint(command: CreateEndpointCommand): void {
   if (typeof command.enabled !== 'boolean') {
     throw new EndpointRegistryError('INVALID_REQUEST', 'enabled must be a boolean');
   }
+  if (command.headers !== undefined) assertHeaders(command.headers);
 }
 
 function validateUpdateEndpoint(command: UpdateEndpointCommand): void {
@@ -120,18 +105,41 @@ function validateUpdateEndpoint(command: UpdateEndpointCommand): void {
   if (
     command.egressAdapter === undefined &&
     command.address === undefined &&
-    command.enabled === undefined
-  ) {
+    command.enabled === undefined &&
+    command.headers === undefined
+  )
     throw new EndpointRegistryError('INVALID_REQUEST', 'at least one endpoint field is required');
-  }
-  if (command.egressAdapter !== undefined) {
-    assertNonBlank(command.egressAdapter, 'egressAdapter');
-  }
-  if (command.address !== undefined) {
-    assertEndpointAddress(command.address);
-  }
+  if (command.egressAdapter !== undefined) assertNonBlank(command.egressAdapter, 'egressAdapter');
+  if (command.address !== undefined) assertEndpointAddress(command.address);
   if (command.enabled !== undefined && typeof command.enabled !== 'boolean') {
     throw new EndpointRegistryError('INVALID_REQUEST', 'enabled must be a boolean');
+  }
+  if (command.headers !== undefined) assertHeaders(command.headers);
+}
+
+const reservedHeaders = new Set([
+  'connection',
+  'content-length',
+  'content-type',
+  'host',
+  'transfer-encoding',
+]);
+const headerNamePattern = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+
+function assertHeaders(headers: Readonly<Record<string, string>>): void {
+  if (typeof headers !== 'object' || headers === null || Array.isArray(headers)) {
+    throw new EndpointRegistryError('INVALID_REQUEST', 'headers must be an object');
+  }
+  const entries = Object.entries(headers);
+  if (entries.length > 32)
+    throw new EndpointRegistryError('INVALID_REQUEST', 'headers may contain at most 32 entries');
+  for (const [name, value] of entries) {
+    if (!headerNamePattern.test(name) || reservedHeaders.has(name.toLowerCase())) {
+      throw new EndpointRegistryError('INVALID_REQUEST', `header ${name} is not allowed`);
+    }
+    if (typeof value !== 'string' || value.length > 4096 || /[\r\n]/.test(value)) {
+      throw new EndpointRegistryError('INVALID_REQUEST', `header ${name} has an invalid value`);
+    }
   }
 }
 
@@ -139,14 +147,10 @@ function assertEndpointAddress(value: string): void {
   assertNonBlank(value, 'address');
   try {
     const parsed = new URL(value);
-    if (
-      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
-      parsed.hostname.length > 0
-    ) {
+    if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname.length > 0)
       return;
-    }
   } catch {
-    // Report a stable validation error below.
+    /* stable validation below */
   }
   throw new EndpointRegistryError(
     'INVALID_REQUEST',
@@ -170,5 +174,6 @@ function toRoute(command: CreateEndpointCommand): EndpointRoute {
     egressAdapter: command.egressAdapter,
     address: command.address,
     enabled: command.enabled,
+    ...(command.headers === undefined ? {} : { headers: { ...command.headers } }),
   };
 }
