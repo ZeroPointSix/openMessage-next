@@ -43,6 +43,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint, format and typecheck
         run: pnpm check
+      - name: User Web quality gates
+        run: pnpm --filter @openmessage/user-web check && pnpm --filter @openmessage/user-web test && pnpm --filter @openmessage/user-web build
       - name: Migrate clean database twice
         run: pnpm db:migrate && pnpm db:migrate
       - name: Unit tests
@@ -60,6 +62,8 @@ jobs:
         uses: actions/checkout@v7
       - name: Build image
         run: docker build -t openmessage-next:ci .
+      - name: Build User Web image
+        run: docker build -f apps/user-web/Dockerfile -t openmessage-user-web:ci .
       - name: Start container
         run: >-
           docker run -d --name app -p 3000:3000
