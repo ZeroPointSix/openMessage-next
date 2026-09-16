@@ -22,19 +22,18 @@ export class HttpEgressAdapter implements EgressAdapter {
     this.#fetch = fetchImplementation;
   }
 
-  async deliver(address: string, envelope: EgressEnvelope): Promise<void> {
+  async deliver(
+    address: string,
+    envelope: EgressEnvelope,
+    headers: Readonly<Record<string, string>> = {},
+  ): Promise<void> {
     const response = await this.#fetch(address, {
       method: 'POST',
       redirect: 'manual',
-      headers: {
-        'content-type': 'application/json',
-      },
+      headers: { ...headers, 'content-type': 'application/json' },
       body: JSON.stringify(envelope),
       signal: AbortSignal.timeout(this.#timeoutMs),
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP egress returned status ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP egress returned status ${response.status}`);
   }
 }

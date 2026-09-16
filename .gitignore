@@ -30,3 +30,6 @@ coverage
 .specstory
 .history
 .cursor
+
+apps/user-web/.data
+apps/user-web/dist

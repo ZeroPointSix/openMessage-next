@@ -10,7 +10,11 @@ export interface EgressEnvelope {
 }
 
 export interface EgressAdapter {
-  deliver(address: string, envelope: EgressEnvelope): Promise<void>;
+  deliver(
+    address: string,
+    envelope: EgressEnvelope,
+    headers?: Readonly<Record<string, string>>,
+  ): Promise<void>;
 }
 
 export interface MessageDispatcher {

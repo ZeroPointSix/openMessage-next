@@ -13,3 +13,8 @@ blockExoticSubdeps: true
 # protobufjs is transitive and its prebuilt output is sufficient for this project.
 allowBuilds:
   protobufjs: false
+  '@tailwindcss/oxide': true
+  esbuild: true
+
+packages:
+  - apps/*

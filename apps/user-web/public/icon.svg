@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>openMessage Decision Deck</title>
+  <rect width="512" height="512" rx="96" fill="#10110f"/>
+  <path d="M120 136h272v188H234l-86 62 22-62h-50z" fill="#f4f3ee"/>
+  <circle cx="344" cy="230" r="34" fill="#e54b35"/>
+</svg>

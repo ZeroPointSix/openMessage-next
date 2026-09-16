@@ -16,12 +16,19 @@ const address = Type.String({
   pattern: '^https?://',
   example: 'https://b.example.com/openmessage',
 });
+const headers = Type.Unsafe<Record<string, string>>({
+  type: 'object',
+  additionalProperties: { type: 'string', maxLength: 4096 },
+  maxProperties: 32,
+  example: { 'x-openmessage-token': 'replace-with-a-secret' },
+});
 const endpoint = Type.Object(
   {
     endpointId,
     egressAdapter: Type.Literal('http', { example: 'http' }),
     address,
     enabled: Type.Boolean({ example: true }),
+    headers: Type.Optional(headers),
   },
   { $id: 'EndpointConfig', additionalProperties: false },
 );
@@ -31,6 +38,7 @@ const createBody = Type.Object(
     egressAdapter: Type.Literal('http', { example: 'http' }),
     address,
     enabled: Type.Boolean({ example: true }),
+    headers: Type.Optional(headers),
   },
   { additionalProperties: false },
 );
@@ -39,6 +47,7 @@ const updateBody = Type.Object(
     address: Type.Optional(address),
     enabled: Type.Optional(Type.Boolean({ example: false })),
     egressAdapter: Type.Optional(Type.Literal('http', { example: 'http' })),
+    headers: Type.Optional(headers),
   },
   { additionalProperties: false, minProperties: 1 },
 );
@@ -75,6 +84,7 @@ export default async function endpointRoutes(fastify: FastifyRouteInstance) {
           egressAdapter: request.body.egressAdapter,
           address: request.body.address,
           enabled: request.body.enabled,
+          ...(request.body.headers === undefined ? {} : { headers: request.body.headers }),
         });
         return reply.status(201).send(created);
       } catch (error) {
@@ -111,7 +121,8 @@ export default async function endpointRoutes(fastify: FastifyRouteInstance) {
       schema: {
         tags: ['Endpoint configuration'],
         summary: 'Update an endpoint route',
-        description: 'Address and enabled updates affect subsequent resolution immediately.',
+        description:
+          'Address, enabled, and header updates affect subsequent resolution immediately.',
         security: [{ endpointConfigBearer: [] }],
         params,
         body: updateBody,
@@ -145,7 +156,6 @@ function sendEndpointError(
   reply: FastifyReply,
 ): FastifyReply {
   if (!(error instanceof EndpointRegistryError)) throw error;
-
   const mapped = {
     INVALID_REQUEST: [400, 'Bad Request'],
     ENDPOINT_NOT_FOUND: [404, 'Not Found'],
