@@ -1,3 +1,10 @@
+## [2.15.1](https://github.com/ZeroPointSix/openMessage-next/compare/v2.15.0...v2.15.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* keep production source readable by runtime user ([#15](https://github.com/ZeroPointSix/openMessage-next/issues/15)) ([5e6b8a5](https://github.com/ZeroPointSix/openMessage-next/commit/5e6b8a59c130ac70ed36f929396f4872d9e06483))
+
 # [2.15.0](https://github.com/ZeroPointSix/openMessage-next/compare/v2.14.0...v2.15.0) (2026-09-15)
 
 
