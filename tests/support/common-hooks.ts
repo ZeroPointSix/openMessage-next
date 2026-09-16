@@ -15,12 +15,24 @@ Before(async function (this: ICustomWorld, { pickle }: ITestCaseHookParameter) {
   this.testName = pickle.name.replaceAll(/\W/g, '-');
   this.feature = pickle;
   this.context = {};
+  this.cleanups = [];
   this.server = await buildApp();
 });
 
 After(async function (this: ICustomWorld, { result }: ITestCaseHookParameter) {
-  if (result) {
-    this.attach(`Status: ${result.status}. Duration:${result.duration.seconds}s`);
+  try {
+    if (result) {
+      this.attach(`Status: ${result.status}. Duration:${result.duration.seconds}s`);
+    }
+    for (const cleanup of this.cleanups.toReversed()) {
+      await cleanup();
+    }
+  } finally {
+    try {
+      await this.server.close();
+    } finally {
+      const { closeDbConnection } = await import('../../src/shared/db/postgres.ts');
+      await closeDbConnection();
+    }
   }
-  await this.server.close();
 });
