@@ -150,7 +150,6 @@ function sendEndpointError(
     INVALID_REQUEST: [400, 'Bad Request'],
     ENDPOINT_NOT_FOUND: [404, 'Not Found'],
     ENDPOINT_ALREADY_EXISTS: [409, 'Conflict'],
-    ENDPOINT_DISABLED: [409, 'Conflict'],
   }[error.code] as [number, string];
   return reply.status(mapped[0]).send(errorBody(mapped[0], mapped[1], error.message, request.id));
 }

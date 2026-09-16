@@ -38,7 +38,7 @@
 ## 服务基础设施
 
 - `src/server/` 是 composition root：只做 Fastify 插件注册与依赖装配，不承载业务规则。
-- `src/interfaces/` 是入站交付层：HTTP 路由（`*.route.ts`，由 server autoload 统一挂在 `/api` 前缀）、未来的 MCP/Webhook 端点。
+- `src/interfaces/` 是入站交付层：HTTP 路由（`*.route.ts`）、未来的 MCP/Webhook 端点。公开契约路由（`messages.route.ts`、`endpoints.route.ts`）按第一阶段设计定稿挂裸 `/v1` 前缀，不参与 `/api` autoload；其余 `*.route.ts` 由 server autoload 统一挂在 `/api` 前缀。
 - `src/modules/` 承载业务模块；模块对外公开面只有 `index.ts` 与 `*.events.ts`，内部实现不对外。
 - `src/adapters/` 承载出站集成：持久化实现、外部服务/Provider SDK 封装。
 - `src/shared/` 与 `src/config/` 是叶子层：通用 CQRS、数据库、异常、工具代码与环境配置，不得反向依赖上层。
