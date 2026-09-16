@@ -36,23 +36,33 @@ test('posts the exact message envelope as JSON', async () => {
 });
 
 test('sends endpoint-configured headers while retaining the JSON content type', async () => {
-  let receivedHeaders: HeadersInit | undefined;
-  const adapter = new HttpEgressAdapter({
-    timeoutMs: 1000,
-    fetch: async (_address, init) => {
-      receivedHeaders = init?.headers;
-      return new Response(null, { status: 204 });
-    },
+  let receivedToken: string | undefined;
+  let receivedClient: string | undefined;
+  let receivedContentType: string | undefined;
+  let receivedBody = '';
+  const endpoint = createServer(async (request, response) => {
+    receivedToken = request.headers['x-openmessage-token'] as string | undefined;
+    receivedClient = request.headers['x-client'] as string | undefined;
+    receivedContentType = request.headers['content-type'];
+    for await (const chunk of request) {
+      receivedBody += chunk.toString();
+    }
+    response.writeHead(204).end();
   });
-  await adapter.deliver('https://example.test/messages', envelope, {
-    'x-openmessage-token': 'inbound-secret',
-    'x-client': 'user-web',
-  });
-  assert.deepEqual(receivedHeaders, {
-    'x-openmessage-token': 'inbound-secret',
-    'x-client': 'user-web',
-    'content-type': 'application/json',
-  });
+  const address = await listen(endpoint);
+  try {
+    const adapter = new HttpEgressAdapter({ timeoutMs: 1000 });
+    await adapter.deliver(`${address}/messages`, envelope, {
+      'x-openmessage-token': 'inbound-secret',
+      'x-client': 'user-web',
+    });
+    assert.equal(receivedToken, 'inbound-secret');
+    assert.equal(receivedClient, 'user-web');
+    assert.equal(receivedContentType, 'application/json');
+    assert.equal(receivedBody, JSON.stringify(envelope));
+  } finally {
+    await close(endpoint);
+  }
 });
 
 async function listen(server: Server): Promise<string> {

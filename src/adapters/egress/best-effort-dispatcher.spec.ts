@@ -38,11 +38,23 @@ class ResolverStub implements EndpointResolver {
 }
 
 class AdapterStub implements EgressAdapter {
-  deliveries: Array<{ address: string; envelope: EgressEnvelope }> = [];
+  deliveries: Array<{
+    address: string;
+    envelope: EgressEnvelope;
+    headers?: Readonly<Record<string, string>>;
+  }> = [];
   error: Error | undefined;
 
-  async deliver(address: string, deliveredEnvelope: EgressEnvelope): Promise<void> {
-    this.deliveries.push({ address, envelope: deliveredEnvelope });
+  async deliver(
+    address: string,
+    deliveredEnvelope: EgressEnvelope,
+    headers?: Readonly<Record<string, string>>,
+  ): Promise<void> {
+    this.deliveries.push({
+      address,
+      envelope: deliveredEnvelope,
+      ...(headers === undefined ? {} : { headers }),
+    });
     if (this.error) {
       throw this.error;
     }
@@ -73,6 +85,28 @@ test('resolves the endpoint and delivers exactly once through its selected adapt
   assert.deepEqual(resolver.calls, ['destination-1']);
   assert.deepEqual(adapter.deliveries, [{ address: 'https://example.test/messages', envelope }]);
   assert.equal(logger.errors.length, 0);
+});
+
+test('passes endpoint headers to the selected adapter', async () => {
+  const resolver = new ResolverStub();
+  resolver.route = { ...route, headers: { 'x-openmessage-token': 'inbound-secret' } };
+  const adapter = new AdapterStub();
+  const dispatcher = new BestEffortDispatcher({
+    endpointResolver: resolver,
+    adapters: new Map([['http', adapter]]),
+    logger: new LoggerStub(),
+  });
+
+  dispatcher.dispatch(envelope);
+  await flush();
+
+  assert.deepEqual(adapter.deliveries, [
+    {
+      address: 'https://example.test/messages',
+      envelope,
+      headers: { 'x-openmessage-token': 'inbound-secret' },
+    },
+  ]);
 });
 
 test('contains delivery rejection and emits structured metadata', async () => {

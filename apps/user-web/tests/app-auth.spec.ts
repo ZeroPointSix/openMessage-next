@@ -48,6 +48,15 @@ describe('user-web authentication boundaries', () => {
         await app.inject({
           method: 'GET',
           url: '/api/config',
+          headers: { 'x-openmessage-token': 'core-inbound-token' },
+        })
+      ).statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/api/config',
           headers: {
             authorization: 'Bearer human-session-token',
           },
@@ -67,6 +76,16 @@ describe('user-web authentication boundaries', () => {
     };
     expect(
       (await app.inject({ method: 'POST', url: '/api/inbound', payload: envelope })).statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/inbound',
+          payload: envelope,
+          headers: { authorization: 'Bearer human-session-token' },
+        })
+      ).statusCode,
     ).toBe(401);
     expect(
       (

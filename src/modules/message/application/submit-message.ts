@@ -20,6 +20,7 @@ export interface EndpointRoute {
   egressAdapter: string;
   address: string;
   enabled: boolean;
+  headers?: Readonly<Record<string, string>>;
 }
 
 export interface EndpointResolver {

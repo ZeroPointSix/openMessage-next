@@ -90,7 +90,7 @@ export class DeckStore {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw error;
       }
-      await this.persist();
+      await this.commit(() => undefined);
     }
   }
 
@@ -116,21 +116,22 @@ export class DeckStore {
   }
 
   async add(envelope: InboundEnvelope): Promise<{ item: DeckItem; created: boolean }> {
-    const existing = this.state.items.find((item) => item.messageId === envelope.message.id);
-    if (existing) {
-      return { item: structuredClone(existing), created: false };
-    }
+    return this.commit((state) => {
+      const existing = state.items.find((item) => item.messageId === envelope.message.id);
+      if (existing) {
+        return { item: existing, created: false };
+      }
 
-    const item: DeckItem = {
-      messageId: envelope.message.id,
-      interactionId: envelope.interactionId,
-      status: 'pending',
-      attention: 'unread',
-      receivedAt: new Date().toISOString(),
-    };
-    this.state.items.push(item);
-    await this.persist();
-    return { item: structuredClone(item), created: true };
+      const item: DeckItem = {
+        messageId: envelope.message.id,
+        interactionId: envelope.interactionId,
+        status: 'pending',
+        attention: 'unread',
+        receivedAt: new Date().toISOString(),
+      };
+      state.items.push(item);
+      return { item, created: true };
+    });
   }
 
   async update(
@@ -141,33 +142,43 @@ export class DeckStore {
       replyDelivery?: ReplyDelivery;
     },
   ): Promise<DeckItem> {
-    const index = this.state.items.findIndex((item) => item.messageId === messageId);
-    if (index < 0) {
-      throw new Error('Deck item not found');
-    }
+    return this.commit((state) => {
+      const index = state.items.findIndex((item) => item.messageId === messageId);
+      if (index < 0) {
+        throw new Error('Deck item not found');
+      }
 
-    const current = this.state.items[index];
-    if (!current) {
-      throw new Error('Deck item not found');
-    }
-    const next = { ...current, ...structuredClone(update) };
-    this.state.items[index] = next;
-    await this.persist();
-    return structuredClone(next);
+      const current = state.items[index];
+      if (!current) {
+        throw new Error('Deck item not found');
+      }
+      const next = { ...current, ...structuredClone(update) };
+      state.items[index] = next;
+      return next;
+    });
   }
 
   async setGestures(gestures: GestureConfig): Promise<GestureConfig> {
-    this.state.gestures = structuredClone(gestures);
-    await this.persist();
-    return this.getGestures();
+    return this.commit((state) => {
+      state.gestures = structuredClone(gestures);
+      return state.gestures;
+    });
   }
 
-  private async persist(): Promise<void> {
-    const snapshot = JSON.stringify(this.state, null, 2);
-    const write = this.writeQueue
+  private async commit<Result>(mutate: (state: PersistedState) => Result): Promise<Result> {
+    const operation = this.writeQueue
       .catch(() => undefined)
-      .then(() => this.writer(this.filePath, snapshot));
-    this.writeQueue = write.catch(() => undefined);
-    await write;
+      .then(async () => {
+        const next = structuredClone(this.state);
+        const result = mutate(next);
+        await this.writer(this.filePath, JSON.stringify(next, null, 2));
+        this.state = next;
+        return structuredClone(result);
+      });
+    this.writeQueue = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return operation;
   }
 }

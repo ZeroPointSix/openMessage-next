@@ -49,12 +49,7 @@ export class BestEffortDispatcher implements MessageDispatcher {
     onResolved(route.egressAdapter);
     const adapter = this.#adapters.get(route.egressAdapter);
     if (!adapter) throw new Error(`Unsupported egress adapter: ${route.egressAdapter}`);
-    const headers = (
-      route as typeof route & {
-        headers?: Readonly<Record<string, string>>;
-      }
-    ).headers;
-    await adapter.deliver(route.address, envelope, headers);
+    await adapter.deliver(route.address, envelope, route.headers);
   }
 }
 

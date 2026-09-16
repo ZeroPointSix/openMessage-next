@@ -85,25 +85,54 @@ describe('ActionService', () => {
     await failingStore.add({ interactionId: 'interaction-1', message });
     const firstService = new ActionService(failingStore, core);
 
-    const result = await firstService.execute('message-1', {
+    await expect(
+      firstService.execute('message-1', { type: 'send-custom-message', value: 'Continue' }),
+    ).rejects.toThrow('disk full');
+    expect(failingStore.get('message-1')).toMatchObject({
+      status: 'pending',
+      replyDelivery: { destination: 'client-a', content: 'Continue' },
+    });
+    expect(submitReply).toHaveBeenCalledTimes(1);
+
+    findReply.mockResolvedValueOnce(canonicalReply);
+    const retried = await firstService.execute('message-1', {
       type: 'send-custom-message',
       value: 'Continue',
     });
-    expect(result).toMatchObject({ item: { status: 'handled' }, replyMessageId: 'reply-1' });
-    await expect(
-      firstService.execute('message-1', { type: 'send-custom-message', value: 'Continue' }),
-    ).rejects.toThrow('Deck item is already handled');
+    expect(retried).toMatchObject({ item: { status: 'handled' }, replyMessageId: 'reply-1' });
     expect(submitReply).toHaveBeenCalledTimes(1);
 
     const recoveredStore = new DeckStore(filePath);
     await recoveredStore.load();
-    findReply.mockResolvedValueOnce(canonicalReply);
-    const recoveredService = new ActionService(recoveredStore, core);
-    const recovered = await recoveredService.execute('message-1', {
-      type: 'send-custom-message',
-      value: 'Continue',
+    expect(recoveredStore.get('message-1')).toMatchObject({
+      status: 'handled',
+      replyDelivery: { replyMessageId: 'reply-1' },
     });
-    expect(recovered).toMatchObject({ item: { status: 'handled' }, replyMessageId: 'reply-1' });
+  });
+
+  it('does not call Core when the recovery record cannot be persisted', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'user-web-prepare-failure-'));
+    const filePath = join(directory, 'deck.json');
+    let writes = 0;
+    const failingWriter = vi.fn(async (path: string, snapshot: string) => {
+      writes += 1;
+      if (writes === 3) throw new Error('disk full');
+      await writeFile(path, snapshot, 'utf8');
+    });
+    const failingStore = new DeckStore(filePath, failingWriter);
+    await failingStore.load();
+    await failingStore.add({ interactionId: 'interaction-1', message });
+    const failingService = new ActionService(failingStore, core);
+
+    await expect(
+      failingService.execute('message-1', { type: 'send-fixed-message', value: 'Stop' }),
+    ).rejects.toThrow('disk full');
+    expect(failingStore.get('message-1')).not.toHaveProperty('replyDelivery');
+    expect(submitReply).not.toHaveBeenCalled();
+
+    await expect(
+      failingService.execute('message-1', { type: 'send-fixed-message', value: 'Stop' }),
+    ).resolves.toMatchObject({ item: { status: 'handled' }, replyMessageId: 'reply-1' });
     expect(submitReply).toHaveBeenCalledTimes(1);
   });
 
