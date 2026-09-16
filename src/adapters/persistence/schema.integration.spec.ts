@@ -54,7 +54,7 @@ describe('core persistence schema', { skip: testDatabaseUrl === undefined }, () 
         ]),
       ),
       {
-        endpoints: ['id', 'egress_adapter', 'address', 'enabled'],
+        endpoints: ['id', 'egress_adapter', 'address', 'enabled', 'headers'],
         interaction_messages: ['interaction_id', 'message_id', 'position'],
         interactions: ['id'],
         messages: ['id', 'origin', 'destination', 'content', 'created_at'],
